@@ -21,7 +21,8 @@ const state = {
   members: loadLocal().members,
   attendance: loadLocal().attendance,
   today: new Date().toISOString().slice(0, 10),
-  loading: false
+  loading: false,
+  reportFilters: { from: new Date().toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10), gender: '', family: '', detail: '', name: '' }
 };
 
 function loadLocal() {
@@ -57,7 +58,11 @@ function isCheckedIn(memberId, date = state.today) {
 function arrivalTime(memberId, date = state.today) {
   const entry = state.attendance.find((item) => item.memberId === memberId && item.date === date);
   if (!entry?.checkedInAt) return '';
-  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(entry.checkedInAt));
+  return formatArrival(entry.checkedInAt);
+}
+
+function formatArrival(value) {
+  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
 }
 
 function stats() {
@@ -68,6 +73,19 @@ function stats() {
     children: state.members.filter((member) => ['Child', 'Children'].includes(member.maritalStatus)).length,
     present: state.attendance.filter((entry) => entry.date === state.today).length
   };
+}
+
+function reportRows() {
+  const filters = state.reportFilters;
+  const name = filters.name.trim().toLowerCase();
+  return state.attendance.map((entry) => ({ entry, member: state.members.find((member) => member.id === entry.memberId) })).filter(({ entry, member }) => {
+    if (!member || (filters.from && entry.date < filters.from) || (filters.to && entry.date > filters.to)) return false;
+    if (filters.gender && member.gender !== filters.gender) return false;
+    if (filters.family && member.family !== filters.family) return false;
+    if (filters.detail && member.maritalStatus !== filters.detail) return false;
+    if (name && ![member.name, member.id].some((value) => value.toLowerCase().includes(name))) return false;
+    return true;
+  }).sort((a, b) => `${b.entry.date}${b.entry.checkedInAt || ''}`.localeCompare(`${a.entry.date}${a.entry.checkedInAt || ''}`));
 }
 
 async function createMember(member) {
@@ -170,7 +188,11 @@ function attendance() {
 function reports() {
   const s = stats();
   const memberCount = state.members.filter((member) => member.category === 'Member').length;
-  return shell(`<section class="page-heading compact"><div><p class="eyebrow">Reports & insights</p><h1>Church reports</h1><p class="subheading">Simple numbers to help leaders understand the church family.</p></div><button class="secondary-button" data-action="export">Download CSV</button></section><section class="report-grid"><div class="report-feature"><span class="report-icon">◒</span><p class="eyebrow">Attendance today</p><strong>${s.present}<small> / ${s.total}</small></strong><div class="progress"><span style="width:${s.total ? (s.present / s.total) * 100 : 0}%"></span></div><small>${s.total ? Math.round((s.present / s.total) * 100) : 0}% of registered people checked in</small></div><div class="report-card"><span class="report-icon blue-icon">♙</span><strong>${memberCount}</strong><span>Church members</span><small>${Math.max(0, s.total - memberCount)} other records</small></div><div class="report-card"><span class="report-icon amber-icon">✦</span><strong>${s.visitors}</strong><span>Visitors</span><small>Welcome and follow up</small></div><div class="report-card"><span class="report-icon purple-icon">◎</span><strong>${s.youth + s.children}</strong><span>Youth & children</span><small>${s.youth} youth · ${s.children} children</small></div></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">Directory breakdown</p><h2>People by life stage</h2></div></div><div class="breakdown"><div><span>Adults</span><strong>${Math.max(0, s.total - s.youth - s.children)}</strong><div class="bar"><i style="width:${s.total ? ((s.total - s.youth - s.children) / s.total) * 100 : 0}%"></i></div></div><div><span>Youth</span><strong>${s.youth}</strong><div class="bar"><i style="width:${s.total ? (s.youth / s.total) * 100 : 0}%"></i></div></div><div><span>Children</span><strong>${s.children}</strong><div class="bar"><i style="width:${s.total ? (s.children / s.total) * 100 : 0}%"></i></div></div></div></section>`);
+  const filters = state.reportFilters;
+  const rows = reportRows();
+  const families = [...new Set(state.members.map((member) => member.family).filter(Boolean))].sort();
+  const details = ['Children', 'Ambassadors', 'Young adults', 'Married', 'Not Married'];
+  return shell(`<section class="page-heading compact"><div><p class="eyebrow">Reports & insights</p><h1>Church reports</h1><p class="subheading">Filter attendance by date, person, gender, family, and life stage.</p></div></section><section class="report-grid"><div class="report-feature"><p class="eyebrow">Filtered attendance</p><strong>${rows.length}</strong><small>check-ins in selected period</small></div><div class="report-card"><strong>${new Set(rows.map(({ member }) => member.id)).size}</strong><span>People checked in</span><small>Unique people</small></div><div class="report-card"><strong>${rows.filter(({ member }) => member.gender === 'Female').length}</strong><span>Female check-ins</span><small>In selected period</small></div><div class="report-card"><strong>${rows.filter(({ member }) => member.gender === 'Male').length}</strong><span>Male check-ins</span><small>In selected period</small></div></section><section class="panel report-filters"><div class="panel-heading"><div><p class="eyebrow">Attendance report</p><h2>Choose filters</h2></div></div><form class="report-filter-grid" data-action="report-filter"><label>From date<input type="date" name="from" value="${esc(filters.from)}" /></label><label>To date<input type="date" name="to" value="${esc(filters.to)}" /></label><label>Person name<input name="name" value="${esc(filters.name)}" placeholder="Search by name or ID" /></label><label>Gender<select name="gender"><option value="">All genders</option><option ${filters.gender === 'Male' ? 'selected' : ''}>Male</option><option ${filters.gender === 'Female' ? 'selected' : ''}>Female</option></select></label><label>Family<select name="family"><option value="">All families</option>${families.map((family) => `<option ${filters.family === family ? 'selected' : ''}>${esc(family)}</option>`).join('')}</select></label><label>Life stage / detail<select name="detail"><option value="">All details</option>${details.map((detail) => `<option ${filters.detail === detail ? 'selected' : ''}>${detail}</option>`).join('')}</select></label><div class="report-filter-actions"><button class="primary-button" type="submit">Run report</button><button class="secondary-button" type="button" data-action="report-export">Download results</button></div></form></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">Matching check-ins</p><h2>${rows.length} results</h2></div></div><div class="table-wrap"><table><thead><tr><th>Date & time</th><th>Person</th><th>Gender</th><th>Family</th><th>Detail</th><th>Class</th></tr></thead><tbody>${rows.map(({ entry, member }) => `<tr><td>${esc(entry.checkedInAt ? formatArrival(entry.checkedInAt) : entry.date)}</td><td><strong>${esc(member.name)}</strong><small>${esc(member.id)}</small></td><td>${esc(member.gender)}</td><td>${esc(member.family || '—')}</td><td>${esc(member.maritalStatus || '—')}</td><td>${esc(member.className || '—')}</td></tr>`).join('') || `<tr><td colspan="6">${emptyState('No check-ins match these filters.')}</td></tr>`}</tbody></table></div></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">Directory breakdown</p><h2>People by life stage</h2></div></div><div class="breakdown"><div><span>Adults</span><strong>${Math.max(0, s.total - s.youth - s.children)}</strong><div class="bar"><i style="width:${s.total ? ((s.total - s.youth - s.children) / s.total) * 100 : 0}%"></i></div></div><div><span>Youth</span><strong>${s.youth}</strong><div class="bar"><i style="width:${s.total ? (s.youth / s.total) * 100 : 0}%"></i></div></div><div><span>Children</span><strong>${s.children}</strong><div class="bar"><i style="width:${s.total ? (s.children / s.total) * 100 : 0}%"></i></div></div></div></section>`);
 }
 
 function render() { document.querySelector('#app').innerHTML = state.view === 'overview' ? overview() : state.view === 'check-in' ? checkIn() : state.view === 'members' ? members() : state.view === 'attendance' ? attendance() : reports(); bindEvents(); }
@@ -184,6 +206,8 @@ function bindEvents() {
   document.querySelectorAll('[data-date-chip]').forEach((button) => button.addEventListener('click', () => { state.today = button.dataset.dateChip; render(); }));
   document.querySelector('[data-action="show-form"]')?.addEventListener('click', showMemberForm);
   document.querySelector('[data-action="export"]')?.addEventListener('click', exportCsv);
+  document.querySelector('[data-action="report-filter"]')?.addEventListener('submit', (event) => { event.preventDefault(); const data = new FormData(event.target); if (data.get('from') && data.get('to') && data.get('from') > data.get('to')) { showToast('The start date must be before the end date.', true); return; } state.reportFilters = { from: data.get('from'), to: data.get('to'), gender: data.get('gender'), family: data.get('family'), detail: data.get('detail'), name: data.get('name') }; render(); });
+  document.querySelector('[data-action="report-export"]')?.addEventListener('click', () => exportReportCsv(reportRows()));
   document.querySelector('[data-action="logout"]')?.addEventListener('click', () => { localStorage.removeItem(SESSION_KEY); state.view = 'overview'; state.query = ''; renderLogin(); });
 }
 
@@ -200,6 +224,8 @@ function showMemberForm() {
   <div class="form-grid"><label>Full name<input name="name" required placeholder="e.g. Ruth Nankunda" /></label><label>Family <span class="required-field">(required)</span><select name="family" required><option value="">Choose a family</option><option>Shepherds</option><option>Apostles</option><option>Prophets</option><option>Kings</option><option>Disciples</option><option>Children</option><option>Visitor</option></select></label><label>Gender<select name="gender" required><option value="">Choose gender</option><option>Male</option><option>Female</option></select></label><label>Other details <select name="maritalStatus"><option value="">Choose a detail</option><option>Children</option><option>Ambassadors</option><option>Young adults</option><option>Married</option><option>Not Married</option></select></label><label>Married group <select name="marriedGroup"><option value="">Choose a group</option><option>Adventist Women</option><option>Adventist Men</option></select></label><label>Class <select name="className"><option value="">Choose a class</option><option>Bible class</option><option>Lesson class</option><option>Children's class</option></select></label><label>Phone number <input name="phone" type="tel" placeholder="07xx xxx xxx" /></label></div><div class="modal-actions"><button type="button" class="secondary-button" data-close>Cancel</button><button class="primary-button" type="submit">Save person</button></div></form>`; document.body.append(modal); modal.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', () => modal.remove())); modal.querySelector('input').focus(); modal.querySelector('form').addEventListener('submit', async (event) => { event.preventDefault(); const formData = new FormData(event.target); const record = { name: formData.get('name').trim(), category: formData.get('family') === 'Visitor' ? 'Visitor' : 'Member', gender: formData.get('gender'), maritalStatus: formData.get('maritalStatus'), family: formData.get('family'), marriedGroup: formData.get('marriedGroup'), className: formData.get('className'), phone: formData.get('phone').trim(), createdAt: state.today }; try { const member = await createMember(record); state.members.push(member); saveLocal(); modal.remove(); state.view = 'members'; render(); showToast(`${record.name} added to the directory`); } catch (error) { showToast(error.message, true); } }); }
 
 function exportCsv() { const rows = [['Member ID', 'Name', 'Category', 'Gender', 'Family', 'Marital status', 'Phone'], ...state.members.map((member) => [member.id, member.name, member.category, member.gender, member.family, member.maritalStatus, member.phone])]; const csv = rows.map((row) => row.map((cell) => `"${String(cell || '').replaceAll('"', '""')}"`).join(',')).join('\n'); const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); link.download = `bethel-directory-${state.today}.csv`; link.click(); URL.revokeObjectURL(link.href); showToast('CSV report downloaded'); }
+
+function exportReportCsv(rows) { const data = [['Date', 'Arrival time', 'Member ID', 'Name', 'Gender', 'Family', 'Detail', 'Class'], ...rows.map(({ entry, member }) => [entry.date, entry.checkedInAt || '', member.id, member.name, member.gender, member.family, member.maritalStatus, member.className])]; const csv = data.map((row) => row.map((cell) => `"${String(cell || '').replaceAll('"', '""')}"`).join(',')).join('\n'); const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); link.download = `bethel-attendance-report-${state.reportFilters.from || 'all'}-to-${state.reportFilters.to || 'all'}.csv`; link.click(); URL.revokeObjectURL(link.href); showToast('Attendance report downloaded'); }
 
 function renderLogin() { document.querySelector('#app').innerHTML = `<main class="login-page"><div class="login-art"><div class="login-brand"><span class="brand-mark">B</span> BETHEL SDA CHURCH</div><div class="login-message">
   
