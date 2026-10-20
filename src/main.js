@@ -133,7 +133,7 @@ function overview() {
   return shell(`<section class="page-heading"><div>
    
     <h1>Welcome Back.</h1>
-    <p class="subheading">church family,attendance, and daily records.</p>
+    <p class="subheading">Bethel Church Attendance records.</p>
     </div><button class="primary-button" data-view="check-in"><span>+</span> Start check-in</button>
     </section>
     <section class="stats-grid">${statCard('Total people', s.total, 'Registered in database')}${statCard('Present today', s.present, `${s.present ? 'Attendance recorded' : 'Ready for check-in'}`)}${statCard('Visitors', s.visitors, 'People visiting Bethel')}${statCard('Youth & children', s.youth + s.children, `${s.youth} youth · ${s.children} children`)}</section>
