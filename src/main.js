@@ -59,7 +59,7 @@ function stats() {
     total: state.members.length,
     visitors: state.members.filter((member) => member.category === 'Visitor').length,
     youth: state.members.filter((member) => member.maritalStatus === 'Youth').length,
-    children: state.members.filter((member) => member.maritalStatus === 'Child').length,
+    children: state.members.filter((member) => ['Child', 'Children'].includes(member.maritalStatus)).length,
     present: state.attendance.filter((entry) => entry.date === state.today).length
   };
 }
@@ -73,11 +73,13 @@ async function createMember(member) {
       gender: member.gender,
       family: member.family,
       marital_status: member.maritalStatus,
+      married_group: member.marriedGroup,
+      class_name: member.className,
       phone: member.phone,
       created_at: member.createdAt
     }).select().single();
     if (error) throw error;
-    return { ...data, maritalStatus: data.marital_status, createdAt: data.created_at };
+    return { ...data, maritalStatus: data.marital_status, marriedGroup: data.married_group, className: data.class_name, createdAt: data.created_at };
   }
   return { ...member, id: `BTL-${String(state.members.length + 1).padStart(3, '0')}` };
 }
@@ -90,7 +92,7 @@ async function hydrateFromSupabase() {
   ]);
   if (membersResult.error) throw membersResult.error;
   if (attendanceResult.error) throw attendanceResult.error;
-  state.members = membersResult.data.map((member) => ({ ...member, maritalStatus: member.marital_status, createdAt: member.created_at }));
+  state.members = membersResult.data.map((member) => ({ ...member, maritalStatus: member.marital_status, marriedGroup: member.married_group, className: member.class_name, createdAt: member.created_at }));
   state.attendance = attendanceResult.data.map((entry) => ({ memberId: entry.member_id, date: entry.date, status: entry.status, checkedInAt: entry.checked_in_at }));
   saveLocal();
 }
@@ -188,7 +190,7 @@ async function markPresent(memberId) {
 }
 
 function showMemberForm() {
-  const modal = document.createElement('div'); modal.className = 'modal-backdrop'; modal.innerHTML = `<form class="modal" id="member-form"><button type="button" class="modal-close" data-close>×</button><p class="eyebrow">New record</p><h2>Add a person</h2><p class="modal-copy">Register a member or visitor in the Bethel directory.</p><div class="form-grid"><label>Full name<input name="name" required placeholder="e.g. Ruth Nankunda" /></label><label>Category<select name="category"><option>Member</option><option>Visitor</option></select></label><label>Gender<select name="gender"><option>Female</option><option>Male</option><option>Other</option></select></label><label>Marital status<select name="maritalStatus"><option>Married</option><option>Single</option><option>Youth</option><option>Child</option><option>Widowed</option><option>Other</option></select></label><label>Family name<input name="family" placeholder="e.g. Nankunda" /></label><label>Phone number<input name="phone" type="tel" placeholder="07xx xxx xxx" /></label></div><div class="modal-actions"><button type="button" class="secondary-button" data-close>Cancel</button><button class="primary-button" type="submit">Save person</button></div></form>`; document.body.append(modal); modal.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', () => modal.remove())); modal.querySelector('input').focus(); modal.querySelector('form').addEventListener('submit', async (event) => { event.preventDefault(); const formData = new FormData(event.target); const record = { name: formData.get('name').trim(), category: formData.get('category'), gender: formData.get('gender'), maritalStatus: formData.get('maritalStatus'), family: formData.get('family').trim(), phone: formData.get('phone').trim(), createdAt: state.today }; try { const member = await createMember(record); state.members.push(member); saveLocal(); modal.remove(); state.view = 'members'; render(); showToast(`${record.name} added to the directory`); } catch (error) { showToast(error.message, true); } }); }
+  const modal = document.createElement('div'); modal.className = 'modal-backdrop'; modal.innerHTML = `<form class="modal" id="member-form"><button type="button" class="modal-close" data-close>×</button><p class="eyebrow">New record</p><h2>Add a person</h2><p class="modal-copy">Register a member or visitor in the Bethel directory.</p><div class="form-grid"><label>Full name<input name="name" required placeholder="e.g. Ruth Nankunda" /></label><label>Family <span class="required-field">(required)</span><select name="family" required><option value="">Choose a family</option><option>Shepherds</option><option>Apostles</option><option>Prophets</option><option>Kings</option><option>Disciples</option><option>Children</option><option>Visitor</option></select></label><label>Gender<select name="gender" required><option value="">Choose gender</option><option>Male</option><option>Female</option></select></label><label>Other details <span class="optional-field">(optional)</span><select name="maritalStatus"><option value="">Choose a detail</option><option>Children</option><option>Ambassadors</option><option>Young adults</option><option>Married</option><option>Not Married</option></select></label><label>Married group <span class="optional-field">(optional)</span><select name="marriedGroup"><option value="">Choose a group</option><option>Adventist Women</option><option>Adventist Men</option></select></label><label>Class <span class="optional-field">(optional)</span><select name="className"><option value="">Choose a class</option><option>Bible class</option><option>Lesson class</option><option>Children's class</option></select></label><label>Phone number <span class="optional-field">(optional)</span><input name="phone" type="tel" placeholder="07xx xxx xxx" /></label></div><div class="modal-actions"><button type="button" class="secondary-button" data-close>Cancel</button><button class="primary-button" type="submit">Save person</button></div></form>`; document.body.append(modal); modal.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', () => modal.remove())); modal.querySelector('input').focus(); modal.querySelector('form').addEventListener('submit', async (event) => { event.preventDefault(); const formData = new FormData(event.target); const record = { name: formData.get('name').trim(), category: formData.get('family') === 'Visitor' ? 'Visitor' : 'Member', gender: formData.get('gender'), maritalStatus: formData.get('maritalStatus'), family: formData.get('family'), marriedGroup: formData.get('marriedGroup'), className: formData.get('className'), phone: formData.get('phone').trim(), createdAt: state.today }; try { const member = await createMember(record); state.members.push(member); saveLocal(); modal.remove(); state.view = 'members'; render(); showToast(`${record.name} added to the directory`); } catch (error) { showToast(error.message, true); } }); }
 
 function exportCsv() { const rows = [['Member ID', 'Name', 'Category', 'Gender', 'Family', 'Marital status', 'Phone'], ...state.members.map((member) => [member.id, member.name, member.category, member.gender, member.family, member.maritalStatus, member.phone])]; const csv = rows.map((row) => row.map((cell) => `"${String(cell || '').replaceAll('"', '""')}"`).join(',')).join('\n'); const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); link.download = `bethel-directory-${state.today}.csv`; link.click(); URL.revokeObjectURL(link.href); showToast('CSV report downloaded'); }
 
