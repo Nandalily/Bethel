@@ -115,7 +115,7 @@ function shell(content) {
           ${navItem('attendance', 'Attendance', '▤')}
           ${navItem('reports', 'Reports', '▥')}
         </nav>
-        <div class="sidebar-bottom"><div class="location"><span class="status-dot"></span><div><strong>Live workspace</strong><small>${supabase ? 'Connected to Supabase' : 'Local preview mode'}</small></div></div><button class="logout-button" data-action="logout">Sign out</button></div>
+        <div class="sidebar-bottom"><div class="location"><span class="status-dot"></span><div><strong>Live workspace</strong><small>${supabase ? 'Connected to Supabase' : 'Local preview mode'}</small></div></div><button class="logout-button" type="button" data-action="logout">Log out</button></div>
       </aside>
       <main class="main-content">
         <header class="topbar"><div class="mobile-brand">BETHEL SDA</div><div class="date-context">${todayLabel()}</div><div class="user-pill"><span class="avatar">B</span><span><strong>BETHEL</strong><small>Administrator</small></span></div></header>
@@ -173,7 +173,7 @@ function bindEvents() {
   document.querySelectorAll('[data-date-chip]').forEach((button) => button.addEventListener('click', () => { state.today = button.dataset.dateChip; render(); }));
   document.querySelector('[data-action="show-form"]')?.addEventListener('click', showMemberForm);
   document.querySelector('[data-action="export"]')?.addEventListener('click', exportCsv);
-  document.querySelector('[data-action="logout"]')?.addEventListener('click', () => { localStorage.removeItem(SESSION_KEY); renderLogin(); });
+  document.querySelector('[data-action="logout"]')?.addEventListener('click', () => { localStorage.removeItem(SESSION_KEY); state.view = 'overview'; state.query = ''; renderLogin(); });
 }
 
 async function markPresent(memberId) {
