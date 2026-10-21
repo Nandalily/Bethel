@@ -1,12 +1,7 @@
 -- Bethel SDA Church Database
--- MySQL 8.0+
--- Run this script on the MySQL server, not in the browser.
-
-CREATE DATABASE IF NOT EXISTS bethel_sda
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_0900_ai_ci;
-
-USE bethel_sda;
+-- MySQL 5.7+/8.0+
+-- Select the database created in your hosting control panel before importing.
+-- Do not include CREATE DATABASE here: shared hosts assign the database name.
 
 CREATE TABLE families (
   id TINYINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -14,7 +9,7 @@ CREATE TABLE families (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_families_name (name)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO families (name) VALUES
   ('Shepherds'),
@@ -38,7 +33,7 @@ CREATE TABLE users (
   PRIMARY KEY (id),
   UNIQUE KEY uq_users_username (username),
   KEY idx_users_active (is_active)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE members (
   id VARCHAR(20) NOT NULL,
@@ -61,7 +56,7 @@ CREATE TABLE members (
   KEY idx_members_name (name),
   KEY idx_members_family (family_id),
   KEY idx_members_created_at (created_at)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE attendance (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -80,7 +75,7 @@ CREATE TABLE attendance (
   CONSTRAINT fk_attendance_user
     FOREIGN KEY (recorded_by) REFERENCES users (id)
     ON UPDATE CASCADE ON DELETE SET NULL
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE login_sessions (
   id CHAR(36) NOT NULL,
@@ -96,4 +91,4 @@ CREATE TABLE login_sessions (
   CONSTRAINT fk_login_sessions_user
     FOREIGN KEY (user_id) REFERENCES users (id)
     ON UPDATE CASCADE ON DELETE CASCADE
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
