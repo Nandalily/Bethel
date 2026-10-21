@@ -22,3 +22,7 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
 
 Then run the SQL in `supabase-schema.sql` in the Supabase SQL editor. The UI keeps the local fallback for development, while member and attendance writes are also sent to Supabase when configured.
+
+## MySQL option
+
+For a MySQL deployment, use [mysql-schema.sql](./mysql-schema.sql). MySQL must be accessed through a backend API; never put MySQL credentials in the Vite frontend. The API should handle login, password hashing, session expiry, member CRUD, and attendance writes. The `login_sessions` table supports the one-hour inactivity timeout already used by the UI.
