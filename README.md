@@ -14,15 +14,27 @@ Open the local Vite URL. Demo credentials are:
 - Username: `BETHEL`
 - Password: `bethelsda12345`
 
-The app runs in local preview mode with browser storage by default. To connect Supabase, create a `.env` file:
+The app uses a MySQL API server. Copy `.env.example` to `.env` and set the MySQL connection values:
 
 ```env
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key
+MYSQL_HOST=127.0.0.1
+MYSQL_PORT=3306
+MYSQL_USER=bethel_app
+MYSQL_PASSWORD=your-password
+MYSQL_DATABASE=bethel_sda
+PORT=3000
 ```
 
-Then run the SQL in `supabase-schema.sql` in the Supabase SQL editor. The UI keeps the local fallback for development, while member and attendance writes are also sent to Supabase when configured.
+Run [mysql-schema.sql](./mysql-schema.sql) in MySQL, create an administrator password hash, and insert the administrator into the `users` table. Start the API and frontend in separate terminals:
+
+```bash
+npm install
+npm run server
+npm run dev
+```
+
+The Vite development server proxies `/api` requests to port 3000. For production, run `npm run build`, then `NODE_ENV=production npm start`.
 
 ## MySQL option
 
-For a MySQL deployment, use [mysql-schema.sql](./mysql-schema.sql). MySQL must be accessed through a backend API; never put MySQL credentials in the Vite frontend. The API should handle login, password hashing, session expiry, member CRUD, and attendance writes. The `login_sessions` table supports the one-hour inactivity timeout already used by the UI.
+For a MySQL deployment, use [mysql-schema.sql](./mysql-schema.sql). MySQL credentials remain server-side in `.env`; they are never sent to the browser. The API handles login, password hashing, session expiry, member CRUD, and attendance writes. The `login_sessions` table supports the one-hour inactivity timeout already used by the UI.
