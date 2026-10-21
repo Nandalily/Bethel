@@ -1,9 +1,5 @@
 import './styles.css';
-import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = SUPABASE_URL && SUPABASE_ANON_KEY ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 const STORAGE_KEY = 'bethel-sda-records';
 const SESSION_KEY = 'bethel-sda-session';
 const SESSION_ACTIVITY_KEY = 'bethel-sda-last-activity';
@@ -101,6 +97,19 @@ function esc(value = '') {
   return String(value).replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
 }
 
+async function apiRequest(path, options = {}) {
+  const response = await fetch(`/api${path}`, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+    credentials: 'include'
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error || `Request failed with status ${response.status}.`);
+  }
+  return response.status === 204 ? null : response.json();
+}
+
 function filteredMembers() {
   const query = state.query.trim().toLowerCase();
   return state.members.filter((member) => !query || [member.name, member.id, member.family, member.phone].some((field) => field.toLowerCase().includes(query)));
@@ -144,43 +153,18 @@ function reportRows() {
 }
 
 async function createMember(member) {
-  if (supabase) {
-    const { data, error } = await supabase.from('members').insert({
-      id: member.id,
-      name: member.name,
-      category: member.category,
-      gender: member.gender,
-      family: member.family,
-      marital_status: member.maritalStatus,
-      married_group: member.marriedGroup,
-      class_name: member.className,
-      phone: member.phone,
-      created_at: member.createdAt
-    }).select().single();
-    if (error) throw error;
-    return { ...data, maritalStatus: data.marital_status, marriedGroup: data.married_group, className: data.class_name, createdAt: data.created_at };
-  }
-  return { ...member, id: `BTL-${String(state.members.length + 1).padStart(3, '0')}` };
+  return apiRequest('/members', { method: 'POST', body: JSON.stringify({ ...member, id: `BTL-${String(state.members.length + 1).padStart(3, '0')}` }) });
 }
 
-async function hydrateFromSupabase() {
-  if (!supabase) return;
-  const [membersResult, attendanceResult] = await Promise.all([
-    supabase.from('members').select('*').order('created_at', { ascending: true }),
-    supabase.from('attendance').select('*')
-  ]);
-  if (membersResult.error) throw membersResult.error;
-  if (attendanceResult.error) throw attendanceResult.error;
-  state.members = membersResult.data.map((member) => ({ ...member, maritalStatus: member.marital_status, marriedGroup: member.married_group, className: member.class_name, createdAt: member.created_at }));
-  state.attendance = attendanceResult.data.map((entry) => ({ memberId: entry.member_id, date: entry.date, status: entry.status, checkedInAt: entry.checked_in_at }));
+async function hydrateFromDatabase() {
+  const [members, attendance] = await Promise.all([apiRequest('/members'), apiRequest('/attendance')]);
+  state.members = members;
+  state.attendance = attendance;
   saveLocal();
 }
 
 async function createAttendance(entry) {
-  if (supabase) {
-    const { error } = await supabase.from('attendance').upsert(entry, { onConflict: 'member_id,date' });
-    if (error) throw error;
-  }
+  await apiRequest('/attendance', { method: 'POST', body: JSON.stringify(entry) });
 }
 
 function shell(content) {
@@ -196,7 +180,7 @@ function shell(content) {
           ${navItem('attendance', 'Attendance', '▤')}
           ${navItem('reports', 'Reports', '▥')}
         </nav>
-        <div class="sidebar-bottom"><div class="location"><span class="status-dot"></span><div><strong>Live workspace</strong><small>${supabase ? 'Connected to Supabase' : 'Local preview mode'}</small></div></div><button class="logout-button" type="button" data-action="logout">Log out</button></div>
+        <div class="sidebar-bottom"><div class="location"><span class="status-dot"></span><div><strong>Live workspace</strong><small>Connected to MySQL</small></div></div><button class="logout-button" type="button" data-action="logout">Log out</button></div>
       </aside>
       <main class="main-content">
         <header class="topbar"><div class="mobile-brand">BETHEL SDA</div><div class="date-context">${todayLabel()}</div><div class="user-pill"><span class="avatar">B</span><span><strong>BETHEL</strong><small>Administrator</small></span></div></header>
@@ -269,14 +253,14 @@ function bindEvents() {
   document.querySelector('[data-action="export"]')?.addEventListener('click', exportCsv);
   document.querySelector('[data-action="report-filter"]')?.addEventListener('submit', (event) => { event.preventDefault(); const data = new FormData(event.target); if (data.get('from') && data.get('to') && data.get('from') > data.get('to')) { showToast('The start date must be before the end date.', true); return; } state.reportFilters = { from: data.get('from'), to: data.get('to'), gender: data.get('gender'), family: data.get('family'), detail: data.get('detail'), name: data.get('name') }; render(); });
   document.querySelector('[data-action="report-export"]')?.addEventListener('click', () => exportReportCsv(reportRows()));
-  document.querySelector('[data-action="logout"]')?.addEventListener('click', () => endSession());
+  document.querySelector('[data-action="logout"]')?.addEventListener('click', async () => { try { await apiRequest('/auth/logout', { method: 'POST' }); } finally { endSession(); } });
 }
 
 async function markPresent(memberId) {
   if (isCheckedIn(memberId)) return;
   const entry = { memberId, date: state.today, status: 'Present', checkedInAt: new Date().toISOString() };
   state.attendance.push(entry); saveLocal();
-  try { await createAttendance({ member_id: memberId, date: state.today, status: 'Present', checked_in_at: entry.checkedInAt }); showToast('Attendance recorded'); } catch (error) { showToast(`Saved locally. Supabase: ${error.message}`, true); }
+  try { await createAttendance(entry); showToast('Attendance recorded'); } catch (error) { showToast(`Attendance could not be saved: ${error.message}`, true); }
   render();
 }
 
@@ -295,17 +279,22 @@ function renderLogin(message = '') { document.querySelector('#app').innerHTML = 
   </div><div class="login-footer">Kampala · Uganda <span>•</span> Est. 2026</div></div><section class="login-panel"><div class="login-panel-inner"><div class="mobile-login-mark">B</div><p class="eyebrow">Church Records</p>
   <h2>Sign in Here</h2>
   
-  <form id="login-form">${message ? `<p class="login-timeout-message">${esc(message)}</p>` : ''}<label>Username<input name="username" autocomplete="username" placeholder="Enter username" required /></label><label>Password<div class="password-field"><input name="password" type="password" autocomplete="current-password" placeholder="Enter password" required /><button class="password-toggle" type="button" aria-label="Show password" title="Show password" data-password-toggle><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12s3.5-5 9.5-5 9.5 5 9.5 5-3.5 5-9.5 5-9.5-5-9.5-5Z" /><circle cx="12" cy="12" r="2.5" /><path class="eye-slash" d="m4 4 16 16" /></svg></button></div></label><button class="primary-button full-width" type="submit">Enter dashboard <span>→</span></button><p class="login-note">Bethel SDA Church · Members & Sabbath Attendance</p></form></div></section></main>`; const loginForm = document.querySelector('#login-form'); const passwordInput = loginForm.querySelector('input[name="password"]'); const passwordToggle = loginForm.querySelector('[data-password-toggle]'); passwordToggle.addEventListener('click', () => { const isVisible = passwordInput.type === 'text'; passwordInput.type = isVisible ? 'password' : 'text'; passwordToggle.classList.toggle('is-visible', !isVisible); passwordToggle.setAttribute('aria-label', isVisible ? 'Show password' : 'Hide password'); passwordToggle.setAttribute('title', isVisible ? 'Show password' : 'Hide password'); }); loginForm.addEventListener('submit', (event) => { event.preventDefault(); const data = new FormData(event.target); if (data.get('username') === 'BETHEL' && data.get('password') === 'bethelsda12345') { localStorage.setItem(SESSION_KEY, 'authenticated'); startInactivityMonitor(); render(); } else showToast('The username or password is not correct.', true); }); }
+  <form id="login-form">${message ? `<p class="login-timeout-message">${esc(message)}</p>` : ''}<label>Username<input name="username" autocomplete="username" placeholder="Enter username" required /></label><label>Password<div class="password-field"><input name="password" type="password" autocomplete="current-password" placeholder="Enter password" required /><button class="password-toggle" type="button" aria-label="Show password" title="Show password" data-password-toggle><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12s3.5-5 9.5-5 9.5 5 9.5 5-9.5 5-9.5 5Z" /><circle cx="12" cy="12" r="2.5" /><path class="eye-slash" d="m4 4 16 16" /></svg></button></div></label><button class="primary-button full-width" type="submit">Enter dashboard <span>→</span></button><p class="login-note">Bethel SDA Church · Members & Sabbath Attendance</p></form></div></section></main>`; const loginForm = document.querySelector('#login-form'); const passwordInput = loginForm.querySelector('input[name="password"]'); const passwordToggle = loginForm.querySelector('[data-password-toggle]'); passwordToggle.addEventListener('click', () => { const isVisible = passwordInput.type === 'text'; passwordInput.type = isVisible ? 'password' : 'text'; passwordToggle.classList.toggle('is-visible', !isVisible); passwordToggle.setAttribute('aria-label', isVisible ? 'Show password' : 'Hide password'); passwordToggle.setAttribute('title', isVisible ? 'Show password' : 'Hide password'); }); loginForm.addEventListener('submit', async (event) => { event.preventDefault(); const data = new FormData(event.target); try { await apiRequest('/auth/login', { method: 'POST', body: JSON.stringify({ username: data.get('username'), password: data.get('password') }) }); localStorage.setItem(SESSION_KEY, 'authenticated'); startInactivityMonitor(); render(); } catch (error) { showToast(error.message, true); } }); }
 
 async function bootstrap() {
   if (localStorage.getItem(SESSION_KEY) !== 'authenticated') return renderLogin();
   const lastActivity = Number(localStorage.getItem(SESSION_ACTIVITY_KEY)) || Date.now();
   if (Date.now() - lastActivity >= INACTIVITY_TIMEOUT) return endSession('Your session expired after one hour of inactivity. Please log in again.');
-  startInactivityMonitor();
   try {
-    await hydrateFromSupabase();
+    await apiRequest('/auth/session');
+    startInactivityMonitor();
+  } catch {
+    return endSession('Your session expired. Please log in again.');
+  }
+  try {
+    await hydrateFromDatabase();
   } catch (error) {
-    showToast(`Using local records. Supabase: ${error.message}`, true);
+    return endSession(error.message);
   }
   render();
 }
