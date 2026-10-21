@@ -6,6 +6,10 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = SUPABASE_URL && SUPABASE_ANON_KEY ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 const STORAGE_KEY = 'bethel-sda-records';
 const SESSION_KEY = 'bethel-sda-session';
+const SESSION_ACTIVITY_KEY = 'bethel-sda-last-activity';
+const INACTIVITY_TIMEOUT = 60 * 60 * 1000;
+let inactivityTimer;
+let lastActivityWrite = 0;
 
 const seedMembers = [
   { id: 'BTL-001', name: 'Grace Namirembe', gender: 'Female', family: 'Namirembe', category: 'Member', maritalStatus: 'Married', phone: '0782 109 519', createdAt: '2026-09-01' },
@@ -37,6 +41,56 @@ function loadLocal() {
 function saveLocal() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ members: state.members, attendance: state.attendance }));
 }
+
+function clearInactivityMonitor() {
+  window.clearTimeout(inactivityTimer);
+  inactivityTimer = undefined;
+}
+
+function scheduleInactivityCheck() {
+  clearInactivityMonitor();
+  if (localStorage.getItem(SESSION_KEY) !== 'authenticated') return;
+  const lastActivity = Number(localStorage.getItem(SESSION_ACTIVITY_KEY)) || Date.now();
+  const remaining = Math.max(0, INACTIVITY_TIMEOUT - (Date.now() - lastActivity));
+  inactivityTimer = window.setTimeout(() => {
+    if (Date.now() - (Number(localStorage.getItem(SESSION_ACTIVITY_KEY)) || 0) >= INACTIVITY_TIMEOUT) {
+      endSession('Your session expired after one hour of inactivity. Please log in again.');
+    } else {
+      scheduleInactivityCheck();
+    }
+  }, remaining);
+}
+
+function recordActivity() {
+  if (localStorage.getItem(SESSION_KEY) !== 'authenticated') return;
+  const now = Date.now();
+  if (now - lastActivityWrite < 5000) return;
+  lastActivityWrite = now;
+  localStorage.setItem(SESSION_ACTIVITY_KEY, String(now));
+  scheduleInactivityCheck();
+}
+
+function startInactivityMonitor() {
+  lastActivityWrite = Date.now();
+  localStorage.setItem(SESSION_ACTIVITY_KEY, String(lastActivityWrite));
+  scheduleInactivityCheck();
+}
+
+function endSession(message = '') {
+  clearInactivityMonitor();
+  localStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(SESSION_ACTIVITY_KEY);
+  state.view = 'overview';
+  state.query = '';
+  renderLogin(message);
+}
+
+['click', 'keydown', 'mousemove', 'scroll', 'touchstart'].forEach((eventName) => {
+  window.addEventListener(eventName, recordActivity, { passive: true });
+});
+window.addEventListener('storage', (event) => {
+  if (event.key === SESSION_ACTIVITY_KEY) scheduleInactivityCheck();
+});
 
 function todayLabel() {
   return new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(`${state.today}T12:00:00`));
@@ -208,7 +262,7 @@ function bindEvents() {
   document.querySelector('[data-action="export"]')?.addEventListener('click', exportCsv);
   document.querySelector('[data-action="report-filter"]')?.addEventListener('submit', (event) => { event.preventDefault(); const data = new FormData(event.target); if (data.get('from') && data.get('to') && data.get('from') > data.get('to')) { showToast('The start date must be before the end date.', true); return; } state.reportFilters = { from: data.get('from'), to: data.get('to'), gender: data.get('gender'), family: data.get('family'), detail: data.get('detail'), name: data.get('name') }; render(); });
   document.querySelector('[data-action="report-export"]')?.addEventListener('click', () => exportReportCsv(reportRows()));
-  document.querySelector('[data-action="logout"]')?.addEventListener('click', () => { localStorage.removeItem(SESSION_KEY); state.view = 'overview'; state.query = ''; renderLogin(); });
+  document.querySelector('[data-action="logout"]')?.addEventListener('click', () => endSession());
 }
 
 async function markPresent(memberId) {
@@ -227,17 +281,20 @@ function exportCsv() { const rows = [['Member ID', 'Name', 'Category', 'Gender',
 
 function exportReportCsv(rows) { const data = [['Date', 'Arrival time', 'Member ID', 'Name', 'Gender', 'Family', 'Detail', 'Class'], ...rows.map(({ entry, member }) => [entry.date, entry.checkedInAt || '', member.id, member.name, member.gender, member.family, member.maritalStatus, member.className])]; const csv = data.map((row) => row.map((cell) => `"${String(cell || '').replaceAll('"', '""')}"`).join(',')).join('\n'); const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); link.download = `bethel-attendance-report-${state.reportFilters.from || 'all'}-to-${state.reportFilters.to || 'all'}.csv`; link.click(); URL.revokeObjectURL(link.href); showToast('Attendance report downloaded'); }
 
-function renderLogin() { document.querySelector('#app').innerHTML = `<main class="login-page"><div class="login-art"><div class="login-brand"><span class="brand-mark">B</span> BETHEL SDA CHURCH</div><div class="login-message">
+function renderLogin(message = '') { document.querySelector('#app').innerHTML = `<main class="login-page"><div class="login-art"><div class="login-brand"><span class="brand-mark">B</span> BETHEL SDA CHURCH</div><div class="login-message">
   
   <h1>Welcome to<br /><em>Bethel SDA</em><br />Church Database</h1>
 
   </div><div class="login-footer">Kampala · Uganda <span>•</span> Est. 2026</div></div><section class="login-panel"><div class="login-panel-inner"><div class="mobile-login-mark">B</div><p class="eyebrow">Church Records</p>
   <h2>Sign in Here</h2>
   
-  <form id="login-form"><label>Username<input name="username" autocomplete="username" placeholder="Enter username" required /></label><label>Password<div class="password-field"><input name="password" type="password" autocomplete="current-password" placeholder="Enter password" required /><button class="password-toggle" type="button" aria-label="Show password" title="Show password" data-password-toggle><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12s3.5-5 9.5-5 9.5 5 9.5 5-3.5 5-9.5 5-9.5-5-9.5-5Z" /><circle cx="12" cy="12" r="2.5" /><path class="eye-slash" d="m4 4 16 16" /></svg></button></div></label><button class="primary-button full-width" type="submit">Enter dashboard <span>→</span></button><p class="login-note">Bethel SDA Church · Members & Sabbath Attendance</p></form></div></section></main>`; const loginForm = document.querySelector('#login-form'); const passwordInput = loginForm.querySelector('input[name="password"]'); const passwordToggle = loginForm.querySelector('[data-password-toggle]'); passwordToggle.addEventListener('click', () => { const isVisible = passwordInput.type === 'text'; passwordInput.type = isVisible ? 'password' : 'text'; passwordToggle.classList.toggle('is-visible', !isVisible); passwordToggle.setAttribute('aria-label', isVisible ? 'Show password' : 'Hide password'); passwordToggle.setAttribute('title', isVisible ? 'Show password' : 'Hide password'); }); loginForm.addEventListener('submit', (event) => { event.preventDefault(); const data = new FormData(event.target); if (data.get('username') === 'BETHEL' && data.get('password') === 'bethelsda12345') { localStorage.setItem(SESSION_KEY, 'authenticated'); render(); } else showToast('The username or password is not correct.', true); }); }
+  <form id="login-form">${message ? `<p class="login-timeout-message">${esc(message)}</p>` : ''}<label>Username<input name="username" autocomplete="username" placeholder="Enter username" required /></label><label>Password<div class="password-field"><input name="password" type="password" autocomplete="current-password" placeholder="Enter password" required /><button class="password-toggle" type="button" aria-label="Show password" title="Show password" data-password-toggle><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12s3.5-5 9.5-5 9.5 5 9.5 5-3.5 5-9.5 5-9.5-5-9.5-5Z" /><circle cx="12" cy="12" r="2.5" /><path class="eye-slash" d="m4 4 16 16" /></svg></button></div></label><button class="primary-button full-width" type="submit">Enter dashboard <span>→</span></button><p class="login-note">Bethel SDA Church · Members & Sabbath Attendance</p></form></div></section></main>`; const loginForm = document.querySelector('#login-form'); const passwordInput = loginForm.querySelector('input[name="password"]'); const passwordToggle = loginForm.querySelector('[data-password-toggle]'); passwordToggle.addEventListener('click', () => { const isVisible = passwordInput.type === 'text'; passwordInput.type = isVisible ? 'password' : 'text'; passwordToggle.classList.toggle('is-visible', !isVisible); passwordToggle.setAttribute('aria-label', isVisible ? 'Show password' : 'Hide password'); passwordToggle.setAttribute('title', isVisible ? 'Show password' : 'Hide password'); }); loginForm.addEventListener('submit', (event) => { event.preventDefault(); const data = new FormData(event.target); if (data.get('username') === 'BETHEL' && data.get('password') === 'bethelsda12345') { localStorage.setItem(SESSION_KEY, 'authenticated'); startInactivityMonitor(); render(); } else showToast('The username or password is not correct.', true); }); }
 
 async function bootstrap() {
   if (localStorage.getItem(SESSION_KEY) !== 'authenticated') return renderLogin();
+  const lastActivity = Number(localStorage.getItem(SESSION_ACTIVITY_KEY)) || Date.now();
+  if (Date.now() - lastActivity >= INACTIVITY_TIMEOUT) return endSession('Your session expired after one hour of inactivity. Please log in again.');
+  startInactivityMonitor();
   try {
     await hydrateFromSupabase();
   } catch (error) {

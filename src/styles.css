@@ -24,3 +24,4 @@
 @media (max-width:650px) { .stat-card { min-height:86px; padding:10px; } .stat-card > strong { font-size:21px; margin-top:7px; } .stat-card > small { font-size:7px; } }
 @media (max-width:900px) { .report-filter-grid { grid-template-columns:repeat(2,1fr); } }
 @media (max-width:650px) { .report-filter-grid { grid-template-columns:1fr; } .report-filter-actions { flex-wrap:wrap; } }
+.login-timeout-message { color:var(--amber); background:var(--amber-soft); border:1px solid #f0d5ad; border-radius:6px; padding:11px 12px; margin:0 0 18px; font-size:12px; line-height:1.5; }
