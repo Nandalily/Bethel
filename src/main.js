@@ -8,6 +8,7 @@ const STORAGE_KEY = 'bethel-sda-records';
 const SESSION_KEY = 'bethel-sda-session';
 const SESSION_ACTIVITY_KEY = 'bethel-sda-last-activity';
 const INACTIVITY_TIMEOUT = 60 * 60 * 1000;
+const FAMILY_NAMES = ['Shepherds', 'Apostles', 'Prophets', 'Kings', 'Disciples', 'Children', 'Visitor'];
 let inactivityTimer;
 let lastActivityWrite = 0;
 
@@ -210,11 +211,12 @@ function statCard(label, value, note) { return `<div class="stat-card"><div clas
 function overview() {
   const s = stats();
   const familyCounts = state.members.reduce((counts, member) => {
-    const family = member.family || 'No family listed';
+    const family = member.family;
+    if (!FAMILY_NAMES.includes(family)) return counts;
     counts[family] = (counts[family] || 0) + 1;
     return counts;
-  }, {});
-  const families = Object.entries(familyCounts).sort(([first], [second]) => first.localeCompare(second));
+  }, Object.fromEntries(FAMILY_NAMES.map((family) => [family, 0])));
+  const families = FAMILY_NAMES.map((family) => [family, familyCounts[family]]);
   return shell(`<section class="page-heading"><div>
    
     <h1>Welcome Back.</h1>
