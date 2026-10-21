@@ -98,7 +98,7 @@ function esc(value = '') {
 }
 
 async function apiRequest(path, options = {}) {
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(`/api${path}.php`, {
     ...options,
     headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
     credentials: 'include'
