@@ -209,7 +209,12 @@ function statCard(label, value, note) { return `<div class="stat-card"><div clas
 
 function overview() {
   const s = stats();
-  const recent = [...state.members].slice(-5).reverse();
+  const familyCounts = state.members.reduce((counts, member) => {
+    const family = member.family || 'No family listed';
+    counts[family] = (counts[family] || 0) + 1;
+    return counts;
+  }, {});
+  const families = Object.entries(familyCounts).sort(([first], [second]) => first.localeCompare(second));
   return shell(`<section class="page-heading"><div>
    
     <h1>Welcome Back.</h1>
@@ -217,7 +222,7 @@ function overview() {
     </div><button class="primary-button" data-view="check-in"><span>+</span> Start check-in</button>
     </section>
     <section class="stats-grid">${statCard('Total people', s.total, 'Registered in database')}${statCard('Present today', s.present, `${s.present ? 'Attendance recorded' : 'Ready for check-in'}`)}${statCard('Visitors', s.visitors, 'People visiting Bethel')}${statCard('Youth & children', s.youth + s.children, `${s.youth} youth · ${s.children} children`)}</section>
-    <div class="content-grid"><section class="panel attendance-panel"><div class="panel-heading"><div><p class="eyebrow">Today at Bethel</p><h2>Attendance snapshot</h2></div><button class="text-button" data-view="attendance">View history →</button></div><div class="attendance-visual"><div class="ring" style="--progress:${s.total ? Math.round((s.present / s.total) * 100) : 0}%"><div><strong>${s.present}</strong><small>of ${s.total} present</small></div></div><div class="legend"><div><span class="legend-dot present"></span><span>Present</span><strong>${s.present}</strong></div><div><span class="legend-dot remaining"></span><span>Not checked in</span><strong>${Math.max(0, s.total - s.present)}</strong></div><button class="outline-button" data-view="check-in">Open check-in</button></div></div></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">Recently added</p><h2>Church family</h2></div><button class="icon-button" data-view="members" title="View all members">→</button></div><div class="member-list">${recent.map(memberRow).join('') || emptyState('No people added yet.')}</div></section></div>`);
+    <div class="content-grid"><section class="panel attendance-panel"><div class="panel-heading"><div><p class="eyebrow">Today at Bethel</p><h2>Attendance snapshot</h2></div><button class="text-button" data-view="attendance">View history →</button></div><div class="attendance-visual"><div class="ring" style="--progress:${s.total ? Math.round((s.present / s.total) * 100) : 0}%"><div><strong>${s.present}</strong><small>of ${s.total} present</small></div></div><div class="legend"><div><span class="legend-dot present"></span><span>Present</span><strong>${s.present}</strong></div><div><span class="legend-dot remaining"></span><span>Not checked in</span><strong>${Math.max(0, s.total - s.present)}</strong></div><button class="outline-button" data-view="check-in">Open check-in</button></div></div></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">People by family</p><h2>Church family</h2></div><button class="icon-button" data-view="members" title="View all members">→</button></div><div class="family-list">${families.map(([family, count]) => `<div class="family-row"><span class="family-name">${esc(family)}</span><strong>${count}</strong><small>${count === 1 ? 'person' : 'people'}</small></div>`).join('') || emptyState('No people added yet.')}</div></section></div>`);
 }
 
 function memberRow(member) { return `<div class="member-row"><span class="person-avatar ${member.category === 'Visitor' ? 'visitor' : ''}">${esc(member.name.charAt(0))}</span><div class="member-info"><strong>${esc(member.name)}</strong><small>${esc(member.id)} · ${esc(member.family || 'No family listed')}</small></div><span class="category-tag ${member.category.toLowerCase()}">${esc(member.category)}</span></div>`; }
