@@ -11,7 +11,7 @@ npm run dev
 
 Open the local Vite URL. Demo credentials are:
 
-- Username: `BETHEL`
+- Username: `BETHELadmin`
 - Password: `bethelsda12345`
 
 The app uses a MySQL API server. Copy `.env.example` to `.env` and set the MySQL connection values:
