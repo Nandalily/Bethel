@@ -332,9 +332,16 @@ const uniqueFemales = [...uniquePeople.values()]
 const uniqueMales = [...uniquePeople.values()]
   .filter((member) => member.gender === 'Male').length;
 
-  const families = [...new Set(state.members.map((member) => member.family).filter(Boolean))].sort();
+  
+  const familyOptions = FAMILY_NAMES.map((family) => `
+  <option value="${escapeHtml(family)}"
+    ${state.reportFilters.family === family ? 'selected' : ''}>
+    ${escapeHtml(family)}
+  </option>
+`).join('');
+
   const details = ['Children', 'Ambassadors', 'Young adults', 'Married', 'Not Married'];
-  return shell(`<section class="page-heading compact"><div><p class="eyebrow">Reports & insights</p><h1>Church ${uniqueFemales}reports</h1><p class="subheading">Filter attendance by date, person, gender, family, and life stage.</p></div></section><section class="report-grid"><div class="report-feature"><p class="eyebrow">Filtered attendance</p><strong>${rows.length}</strong><small>check-ins in selected period</small></div><div class="report-card"><strong>${new Set(rows.map(({ member }) => member.id)).size}</strong><span>People checked in</span><small>Unique people</small></div><div class="report-card"><strong></strong><span>Female check-ins</span><small>In selected period</small></div><div class="report-card"><strong>${uniqueMales}</strong><span>Male check-ins</span><small>In selected period</small></div></section><section class="panel report-filters"><div class="panel-heading"><div><p class="eyebrow">Attendance report</p><h2>Choose filters</h2></div></div><form class="report-filter-grid" data-action="report-filter"><label>From date<input type="date" name="from" value="${esc(filters.from)}" /></label><label>To date<input type="date" name="to" value="${esc(filters.to)}" /></label><label>Person name<input name="name" value="${esc(filters.name)}" placeholder="Search by name or ID" /></label><label>Gender<select name="gender"><option value="">All genders</option><option ${filters.gender === 'Male' ? 'selected' : ''}>Male</option><option ${filters.gender === 'Female' ? 'selected' : ''}>Female</option></select></label><label>Family<select name="family"><option value="">All families</option>${families.map((family) => `<option ${filters.family === family ? 'selected' : ''}>${esc(family)}</option>`).join('')}</select></label><label>Life stage / detail<select name="detail"><option value="">All details</option>${details.map((detail) => `<option ${filters.detail === detail ? 'selected' : ''}>${detail}</option>`).join('')}</select></label>
+  return shell(`<section class="page-heading compact"><div><p class="eyebrow">Reports & insights</p><h1>Church reports</h1><p class="subheading">Filter attendance by date, person, gender, family, and life stage.</p></div></section><section class="report-grid"><div class="report-feature"><p class="eyebrow">Filtered attendance</p><strong>${rows.length}</strong><small>check-ins in selected period</small></div><div class="report-card"><strong>${new Set(rows.map(({ member }) => member.id)).size}</strong><span>People checked in</span><small>Unique people</small></div><div class="report-card"><strong>${uniqueFemales}</strong><span>Female attendees</span><small>Unique people in selected period</small></div><div class="report-card"><strong>${uniqueMales}</strong><span>Male check-ins</span><small>In selected period</small></div></section><section class="panel report-filters"><div class="panel-heading"><div><p class="eyebrow">Attendance report</p><h2>Choose filters</h2></div></div><form class="report-filter-grid" data-action="report-filter"><label>From date<input type="date" name="from" value="${esc(filters.from)}" /></label><label>To date<input type="date" name="to" value="${esc(filters.to)}" /></label><label>Person name<input name="name" value="${esc(filters.name)}" placeholder="Search by name or ID" /></label><label>Gender<select name="gender"><option value="">All genders</option><option ${filters.gender === 'Male' ? 'selected' : ''}>Male</option><option ${filters.gender === 'Female' ? 'selected' : ''}>Female</option></select></label><label>Family<select name="family"><option value="">All families</option>${familyOptions}</select></label><label>Life stage / detail<select name="detail"><option value="">All details</option>${details.map((detail) => `<option ${filters.detail === detail ? 'selected' : ''}>${detail}</option>`).join('')}</select></label>
  <div class="report-filter-actions">
   <button class="primary-button" type="submit">Run report</button>
   <button class="secondary-button" type="button" data-action="report-reset">
@@ -358,7 +365,36 @@ function bindEvents() {
   document.querySelectorAll('[data-date-chip]').forEach((button) => button.addEventListener('click', () => { state.today = button.dataset.dateChip; render(); }));
   document.querySelector('[data-action="show-form"]')?.addEventListener('click', showMemberForm);
   document.querySelector('[data-action="export"]')?.addEventListener('click', exportCsv);
-  document.querySelector('[data-action="report-filter"]')?.addEventListener('submit', (event) => { event.preventDefault(); const data = new FormData(event.target); if (data.get('from') && data.get('to') && data.get('from') > data.get('to')) { showToast('The start date must be before the end date.', true); return; } state.reportFilters = { from: data.get('from'), to: data.get('to'), gender: data.get('gender'), family: data.get('family'), detail: data.get('detail'), name: data.get('name') }; render(); });
+  
+  document.querySelector('[data-action="report-filter"]')
+  ?.addEventListener('submit', (event) => {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+    const data = new FormData(form);
+
+    const from = String(data.get('from') || '');
+    const to = String(data.get('to') || '');
+
+    if (from && to && from > to) {
+      showToast('The start date cannot be after the end date.', true);
+      return;
+    }
+
+    state.reportFilters = {
+      from,
+      to,
+      gender: String(data.get('gender') || ''),
+      family: String(data.get('family') || ''),
+      detail: String(data.get('detail') || ''),
+      name: String(data.get('name') || '')
+    };
+
+    // Refresh the report using the selected filters.
+    render();
+  });
+  
+  
   document.querySelector('[data-action="report-reset"]')
   ?.addEventListener('click', () => {
     state.reportFilters = {
