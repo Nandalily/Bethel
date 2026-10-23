@@ -334,9 +334,9 @@ const uniqueMales = [...uniquePeople.values()]
 
   
   const familyOptions = FAMILY_NAMES.map((family) => `
-  <option value="${escapeHtml(family)}"
-    ${state.reportFilters.family === family ? 'selected' : ''}>
-    ${escapeHtml(family)}
+  <option value="${esc(family)}"
+    ${filters.family === family ? 'selected' : ''}>
+    ${esc(family)}
   </option>
 `).join('');
 
