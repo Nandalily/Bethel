@@ -1,10 +1,10 @@
 <?php
 declare(strict_types=1);
 
-const DB_HOST = 'YOUR_INFINITYFREE_MYSQL_HOST';
-const DB_USER = 'YOUR_INFINITYFREE_MYSQL_USER';
-const DB_PASSWORD = 'YOUR_INFINITYFREE_MYSQL_PASSWORD';
-const DB_NAME = 'YOUR_INFINITYFREE_DATABASE_NAME';
+const DB_HOST = 'sql111.infinityfree.com';
+const DB_USER = 'if0_43235873';
+const DB_PASSWORD = 'leEYSJnOvbqzdLM';
+const DB_NAME = 'if0_43235873_bethel_sda';
 
 function db(): mysqli
 {
