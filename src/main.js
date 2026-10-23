@@ -23,7 +23,14 @@ const state = {
   attendance: loadLocal().attendance,
   today: new Date().toISOString().slice(0, 10),
   loading: false,
-  reportFilters: { from: new Date().toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10), gender: '', family: '', detail: '', name: '' }
+  reportFilters: {
+  from: '',
+  to: '',
+  gender: '',
+  family: '',
+  detail: '',
+  name: ''
+}
 };
 
 function loadLocal() {
@@ -139,18 +146,98 @@ function stats() {
   };
 }
 
+
 function reportRows() {
   const filters = state.reportFilters;
-  const name = filters.name.trim().toLowerCase();
-  return state.attendance.map((entry) => ({ entry, member: state.members.find((member) => member.id === entry.memberId) })).filter(({ entry, member }) => {
-    if (!member || (filters.from && entry.date < filters.from) || (filters.to && entry.date > filters.to)) return false;
-    if (filters.gender && member.gender !== filters.gender) return false;
-    if (filters.family && member.family !== filters.family) return false;
-    if (filters.detail && member.maritalStatus !== filters.detail) return false;
-    if (name && ![member.name, member.id].some((value) => value.toLowerCase().includes(name))) return false;
-    return true;
-  }).sort((a, b) => `${b.entry.date}${b.entry.checkedInAt || ''}`.localeCompare(`${a.entry.date}${a.entry.checkedInAt || ''}`));
+  const nameQuery = String(filters.name || '').trim().toLowerCase();
+
+  // Match attendance records to members using string IDs.
+  // Accept both camelCase and snake_case API field names.
+  const membersById = new Map(
+    state.members.map((member) => [
+      String(member.id ?? '').trim(),
+      {
+        ...member,
+        id: String(member.id ?? ''),
+        name: String(member.name ?? ''),
+        gender: String(member.gender ?? ''),
+        family: String(member.family ?? ''),
+        maritalStatus: String(
+          member.maritalStatus ?? member.marital_status ?? ''
+        ),
+        className: String(member.className ?? member.class_name ?? '')
+      }
+    ])
+  );
+
+  return state.attendance
+    .map((entry) => {
+      const memberId = String(
+        entry.memberId ?? entry.member_id ?? ''
+      ).trim();
+
+      const date = String(
+        entry.date ?? entry.attendance_date ?? ''
+      ).slice(0, 10);
+
+      const checkedInAt =
+        entry.checkedInAt ?? entry.checked_in_at ?? '';
+
+      return {
+        entry: { ...entry, memberId, date, checkedInAt },
+        member: membersById.get(memberId)
+      };
+    })
+    .filter(({ entry, member }) => {
+      if (!member || !entry.date) return false;
+
+      // Date range
+      if (filters.from && entry.date < filters.from) return false;
+      if (filters.to && entry.date > filters.to) return false;
+
+      // Gender
+      if (
+        filters.gender &&
+        member.gender.toLowerCase() !== filters.gender.toLowerCase()
+      ) {
+        return false;
+      }
+
+      // Family
+      if (
+        filters.family &&
+        member.family.toLowerCase() !== filters.family.toLowerCase()
+      ) {
+        return false;
+      }
+
+      // Life stage / detail
+      if (
+        filters.detail &&
+        member.maritalStatus.toLowerCase() !== filters.detail.toLowerCase()
+      ) {
+        return false;
+      }
+
+      // Person name or member ID
+      if (
+        nameQuery &&
+        ![member.name, member.id].some((value) =>
+          value.toLowerCase().includes(nameQuery)
+        )
+      ) {
+        return false;
+      }
+
+      return true;
+    })
+    .sort((a, b) => {
+      const dateA = `${a.entry.date} ${a.entry.checkedInAt || ''}`;
+      const dateB = `${b.entry.date} ${b.entry.checkedInAt || ''}`;
+      return dateB.localeCompare(dateA);
+    });
 }
+
 
 async function createMember(member) {
   return apiRequest('/members', { method: 'POST', body: JSON.stringify({ ...member, id: `BTL-${String(state.members.length + 1).padStart(3, '0')}` }) });
@@ -237,7 +324,17 @@ function reports() {
   const rows = reportRows();
   const families = [...new Set(state.members.map((member) => member.family).filter(Boolean))].sort();
   const details = ['Children', 'Ambassadors', 'Young adults', 'Married', 'Not Married'];
-  return shell(`<section class="page-heading compact"><div><p class="eyebrow">Reports & insights</p><h1>Church reports</h1><p class="subheading">Filter attendance by date, person, gender, family, and life stage.</p></div></section><section class="report-grid"><div class="report-feature"><p class="eyebrow">Filtered attendance</p><strong>${rows.length}</strong><small>check-ins in selected period</small></div><div class="report-card"><strong>${new Set(rows.map(({ member }) => member.id)).size}</strong><span>People checked in</span><small>Unique people</small></div><div class="report-card"><strong>${rows.filter(({ member }) => member.gender === 'Female').length}</strong><span>Female check-ins</span><small>In selected period</small></div><div class="report-card"><strong>${rows.filter(({ member }) => member.gender === 'Male').length}</strong><span>Male check-ins</span><small>In selected period</small></div></section><section class="panel report-filters"><div class="panel-heading"><div><p class="eyebrow">Attendance report</p><h2>Choose filters</h2></div></div><form class="report-filter-grid" data-action="report-filter"><label>From date<input type="date" name="from" value="${esc(filters.from)}" /></label><label>To date<input type="date" name="to" value="${esc(filters.to)}" /></label><label>Person name<input name="name" value="${esc(filters.name)}" placeholder="Search by name or ID" /></label><label>Gender<select name="gender"><option value="">All genders</option><option ${filters.gender === 'Male' ? 'selected' : ''}>Male</option><option ${filters.gender === 'Female' ? 'selected' : ''}>Female</option></select></label><label>Family<select name="family"><option value="">All families</option>${families.map((family) => `<option ${filters.family === family ? 'selected' : ''}>${esc(family)}</option>`).join('')}</select></label><label>Life stage / detail<select name="detail"><option value="">All details</option>${details.map((detail) => `<option ${filters.detail === detail ? 'selected' : ''}>${detail}</option>`).join('')}</select></label><div class="report-filter-actions"><button class="primary-button" type="submit">Run report</button><button class="secondary-button" type="button" data-action="report-export">Download results</button></div></form></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">Matching check-ins</p><h2>${rows.length} results</h2></div></div><div class="table-wrap"><table><thead><tr><th>Date & time</th><th>Person</th><th>Gender</th><th>Family</th><th>Detail</th><th>Class</th></tr></thead><tbody>${rows.map(({ entry, member }) => `<tr><td>${esc(entry.checkedInAt ? formatArrival(entry.checkedInAt) : entry.date)}</td><td><strong>${esc(member.name)}</strong><small>${esc(member.id)}</small></td><td>${esc(member.gender)}</td><td>${esc(member.family || '—')}</td><td>${esc(member.maritalStatus || '—')}</td><td>${esc(member.className || '—')}</td></tr>`).join('') || `<tr><td colspan="6">${emptyState('No check-ins match these filters.')}</td></tr>`}</tbody></table></div></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">Directory breakdown</p><h2>People by life stage</h2></div></div><div class="breakdown"><div><span>Adults</span><strong>${Math.max(0, s.total - s.youth - s.children)}</strong><div class="bar"><i style="width:${s.total ? ((s.total - s.youth - s.children) / s.total) * 100 : 0}%"></i></div></div><div><span>Youth</span><strong>${s.youth}</strong><div class="bar"><i style="width:${s.total ? (s.youth / s.total) * 100 : 0}%"></i></div></div><div><span>Children</span><strong>${s.children}</strong><div class="bar"><i style="width:${s.total ? (s.children / s.total) * 100 : 0}%"></i></div></div></div></section>`);
+  return shell(`<section class="page-heading compact"><div><p class="eyebrow">Reports & insights</p><h1>Church reports</h1><p class="subheading">Filter attendance by date, person, gender, family, and life stage.</p></div></section><section class="report-grid"><div class="report-feature"><p class="eyebrow">Filtered attendance</p><strong>${rows.length}</strong><small>check-ins in selected period</small></div><div class="report-card"><strong>${new Set(rows.map(({ member }) => member.id)).size}</strong><span>People checked in</span><small>Unique people</small></div><div class="report-card"><strong>${rows.filter(({ member }) => member.gender === 'Female').length}</strong><span>Female check-ins</span><small>In selected period</small></div><div class="report-card"><strong>${rows.filter(({ member }) => member.gender === 'Male').length}</strong><span>Male check-ins</span><small>In selected period</small></div></section><section class="panel report-filters"><div class="panel-heading"><div><p class="eyebrow">Attendance report</p><h2>Choose filters</h2></div></div><form class="report-filter-grid" data-action="report-filter"><label>From date<input type="date" name="from" value="${esc(filters.from)}" /></label><label>To date<input type="date" name="to" value="${esc(filters.to)}" /></label><label>Person name<input name="name" value="${esc(filters.name)}" placeholder="Search by name or ID" /></label><label>Gender<select name="gender"><option value="">All genders</option><option ${filters.gender === 'Male' ? 'selected' : ''}>Male</option><option ${filters.gender === 'Female' ? 'selected' : ''}>Female</option></select></label><label>Family<select name="family"><option value="">All families</option>${families.map((family) => `<option ${filters.family === family ? 'selected' : ''}>${esc(family)}</option>`).join('')}</select></label><label>Life stage / detail<select name="detail"><option value="">All details</option>${details.map((detail) => `<option ${filters.detail === detail ? 'selected' : ''}>${detail}</option>`).join('')}</select></label>
+ <div class="report-filter-actions">
+  <button class="primary-button" type="submit">Run report</button>
+  <button class="secondary-button" type="button" data-action="report-reset">
+    Reset filters
+  </button>
+  <button class="secondary-button" type="button" data-action="report-export">
+    Download results
+  </button>
+</div>
+  </form></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">Matching check-ins</p><h2>${rows.length} results</h2></div></div><div class="table-wrap"><table><thead><tr><th>Date & time</th><th>Person</th><th>Gender</th><th>Family</th><th>Detail</th><th>Class</th></tr></thead><tbody>${rows.map(({ entry, member }) => `<tr><td>${esc(entry.checkedInAt ? formatArrival(entry.checkedInAt) : entry.date)}</td><td><strong>${esc(member.name)}</strong><small>${esc(member.id)}</small></td><td>${esc(member.gender)}</td><td>${esc(member.family || '—')}</td><td>${esc(member.maritalStatus || '—')}</td><td>${esc(member.className || '—')}</td></tr>`).join('') || `<tr><td colspan="6">${emptyState('No check-ins match these filters.')}</td></tr>`}</tbody></table></div></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">Directory breakdown</p><h2>People by life stage</h2></div></div><div class="breakdown"><div><span>Adults</span><strong>${Math.max(0, s.total - s.youth - s.children)}</strong><div class="bar"><i style="width:${s.total ? ((s.total - s.youth - s.children) / s.total) * 100 : 0}%"></i></div></div><div><span>Youth</span><strong>${s.youth}</strong><div class="bar"><i style="width:${s.total ? (s.youth / s.total) * 100 : 0}%"></i></div></div><div><span>Children</span><strong>${s.children}</strong><div class="bar"><i style="width:${s.total ? (s.children / s.total) * 100 : 0}%"></i></div></div></div></section>`);
 }
 
 function render() { document.querySelector('#app').innerHTML = state.view === 'overview' ? overview() : state.view === 'check-in' ? checkIn() : state.view === 'members' ? members() : state.view === 'attendance' ? attendance() : reports(); bindEvents(); }
@@ -252,6 +349,20 @@ function bindEvents() {
   document.querySelector('[data-action="show-form"]')?.addEventListener('click', showMemberForm);
   document.querySelector('[data-action="export"]')?.addEventListener('click', exportCsv);
   document.querySelector('[data-action="report-filter"]')?.addEventListener('submit', (event) => { event.preventDefault(); const data = new FormData(event.target); if (data.get('from') && data.get('to') && data.get('from') > data.get('to')) { showToast('The start date must be before the end date.', true); return; } state.reportFilters = { from: data.get('from'), to: data.get('to'), gender: data.get('gender'), family: data.get('family'), detail: data.get('detail'), name: data.get('name') }; render(); });
+  document.querySelector('[data-action="report-reset"]')
+  ?.addEventListener('click', () => {
+    state.reportFilters = {
+      from: '',
+      to: '',
+      gender: '',
+      family: '',
+      detail: '',
+      name: ''
+    };
+
+    render();
+  });
+  
   document.querySelector('[data-action="report-export"]')?.addEventListener('click', () => exportReportCsv(reportRows()));
   document.querySelector('[data-action="logout"]')?.addEventListener('click', async () => { try { await apiRequest('/auth/logout', { method: 'POST' }); } finally { endSession(); } });
 }
