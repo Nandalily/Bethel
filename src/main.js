@@ -322,6 +322,16 @@ function reports() {
   const memberCount = state.members.filter((member) => member.category === 'Member').length;
   const filters = state.reportFilters;
   const rows = reportRows();
+  const uniquePeople = new Map(
+  rows.map(({ member }) => [member.id, member])
+);
+
+const uniqueFemales = [...uniquePeople.values()]
+  .filter((member) => member.gender === 'Female').length;
+
+const uniqueMales = [...uniquePeople.values()]
+  .filter((member) => member.gender === 'Male').length;
+  
   const families = [...new Set(state.members.map((member) => member.family).filter(Boolean))].sort();
   const details = ['Children', 'Ambassadors', 'Young adults', 'Married', 'Not Married'];
   return shell(`<section class="page-heading compact"><div><p class="eyebrow">Reports & insights</p><h1>Church reports</h1><p class="subheading">Filter attendance by date, person, gender, family, and life stage.</p></div></section><section class="report-grid"><div class="report-feature"><p class="eyebrow">Filtered attendance</p><strong>${rows.length}</strong><small>check-ins in selected period</small></div><div class="report-card"><strong>${new Set(rows.map(({ member }) => member.id)).size}</strong><span>People checked in</span><small>Unique people</small></div><div class="report-card"><strong>${rows.filter(({ member }) => member.gender === 'Female').length}</strong><span>Female check-ins</span><small>In selected period</small></div><div class="report-card"><strong>${rows.filter(({ member }) => member.gender === 'Male').length}</strong><span>Male check-ins</span><small>In selected period</small></div></section><section class="panel report-filters"><div class="panel-heading"><div><p class="eyebrow">Attendance report</p><h2>Choose filters</h2></div></div><form class="report-filter-grid" data-action="report-filter"><label>From date<input type="date" name="from" value="${esc(filters.from)}" /></label><label>To date<input type="date" name="to" value="${esc(filters.to)}" /></label><label>Person name<input name="name" value="${esc(filters.name)}" placeholder="Search by name or ID" /></label><label>Gender<select name="gender"><option value="">All genders</option><option ${filters.gender === 'Male' ? 'selected' : ''}>Male</option><option ${filters.gender === 'Female' ? 'selected' : ''}>Female</option></select></label><label>Family<select name="family"><option value="">All families</option>${families.map((family) => `<option ${filters.family === family ? 'selected' : ''}>${esc(family)}</option>`).join('')}</select></label><label>Life stage / detail<select name="detail"><option value="">All details</option>${details.map((detail) => `<option ${filters.detail === detail ? 'selected' : ''}>${detail}</option>`).join('')}</select></label>
