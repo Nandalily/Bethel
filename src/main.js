@@ -8,13 +8,13 @@ const FAMILY_NAMES = ['Shepherds', 'Apostles', 'Prophets', 'Kings', 'Disciples',
 let inactivityTimer;
 let lastActivityWrite = 0;
 
-const seedMembers = [
-  { id: 'BTL-001', name: 'Grace Namirembe', gender: 'Female', family: 'Namirembe', category: 'Member', maritalStatus: 'Married', phone: '0782 109 519', createdAt: '2026-09-01' },
-  { id: 'BTL-002', name: 'Daniel Kato', gender: 'Male', family: 'Kato', category: 'Member', maritalStatus: 'Single', phone: '0704 210 118', createdAt: '2026-09-02' },
-  { id: 'BTL-003', name: 'Sarah Achieng', gender: 'Female', family: 'Achieng', category: 'Visitor', maritalStatus: 'Youth', phone: '', createdAt: '2026-09-14' },
-  { id: 'BTL-004', name: 'Michael Okello', gender: 'Male', family: 'Okello', category: 'Member', maritalStatus: 'Single', phone: '', createdAt: '2026-09-18' },
-  { id: 'BTL-005', name: 'Esther Nakato', gender: 'Female', family: 'Nakato', category: 'Member', maritalStatus: 'Child', phone: '', createdAt: '2026-09-20' }
-];
+// const seedMembers = [
+//   { id: 'BTL-001', name: 'Grace Namirembe', gender: 'Female', family: 'Namirembe', category: 'Member', maritalStatus: 'Married', phone: '0782 109 519', createdAt: '2026-09-01' },
+//   { id: 'BTL-002', name: 'Daniel Kato', gender: 'Male', family: 'Kato', category: 'Member', maritalStatus: 'Single', phone: '0704 210 118', createdAt: '2026-09-02' },
+//   { id: 'BTL-003', name: 'Sarah Achieng', gender: 'Female', family: 'Achieng', category: 'Visitor', maritalStatus: 'Youth', phone: '', createdAt: '2026-09-14' },
+//   { id: 'BTL-004', name: 'Michael Okello', gender: 'Male', family: 'Okello', category: 'Member', maritalStatus: 'Single', phone: '', createdAt: '2026-09-18' },
+//   { id: 'BTL-005', name: 'Esther Nakato', gender: 'Female', family: 'Nakato', category: 'Member', maritalStatus: 'Child', phone: '', createdAt: '2026-09-20' }
+// ];
 
 const state = {
   view: 'overview',
@@ -29,9 +29,9 @@ const state = {
 function loadLocal() {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    return stored || { members: seedMembers, attendance: [] };
+    return stored || { members: [], attendance: [] };
   } catch {
-    return { members: seedMembers, attendance: [] };
+    return { members: [], attendance: [] };
   }
 }
 
