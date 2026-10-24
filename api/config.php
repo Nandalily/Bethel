@@ -33,8 +33,14 @@ function json_response(mixed $data, int $status = 200): never
 
 function request_body(): array
 {
-    $body = json_decode(file_get_contents('php://input'), true);
-    return is_array($body) ? $body : [];
+    $raw = file_get_contents('php://input');
+    $body = json_decode($raw, true);
+
+    if (json_last_error() !== JSON_ERROR_NONE || !is_array($body)) {
+        json_response(['error' => 'Invalid JSON request body.'], 400);
+    }
+
+    return $body;
 }
 
 function require_method(string $method): void
