@@ -355,10 +355,270 @@ const uniqueMales = [...uniquePeople.values()]
     Download results
   </button>
 </div>
-  </form></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">Matching check-ins</p><h2>${rows.length} results</h2></div></div><div class="table-wrap"><table><thead><tr><th>Date & time</th><th>Person</th><th>Gender</th><th>Family</th><th>Detail</th><th>Class</th></tr></thead><tbody>${rows.map(({ entry, member }) => `<tr><td>${esc(entry.checkedInAt ? formatArrival(entry.checkedInAt) : entry.date)}</td><td><strong>${esc(member.name)}</strong><small>${esc(member.id)}</small></td><td>${esc(member.gender)}</td><td>${esc(member.family || '—')}</td><td>${esc(member.maritalStatus || '—')}</td><td>${esc(member.className || '—')}</td></tr>`).join('') || `<tr><td colspan="6">${emptyState('No check-ins match these filters.')}</td></tr>`}</tbody></table></div></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">Directory breakdown</p><h2>People by life stage</h2></div></div><div class="breakdown"><div><span>Adults</span><strong>${Math.max(0, s.total - s.youth - s.children)}</strong><div class="bar"><i style="width:${s.total ? ((s.total - s.youth - s.children) / s.total) * 100 : 0}%"></i></div></div><div><span>Youth</span><strong>${s.youth}</strong><div class="bar"><i style="width:${s.total ? (s.youth / s.total) * 100 : 0}%"></i></div></div><div><span>Children</span><strong>${s.children}</strong><div class="bar"><i style="width:${s.total ? (s.children / s.total) * 100 : 0}%"></i></div></div></div></section>`);
+  </form></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">Matching check-ins</p><h2>${rows.length} results</h2></div></div>
+  <div class="table-wrap"><table><thead><tr><th>Date & time</th><th>Person</th><th>Gender</th><th>Family</th><th>Detail</th><th>Class</th></tr></thead><tbody>${rows.map(({ entry, member }) => `<tr>
+  <td>${esc(entry.checkedInAt ? formatArrival(entry.checkedInAt) : entry.date)}</td><td><strong>${esc(member.name)}</strong><small>${esc(member.id)}</small></td><td>${esc(member.gender)}</td><td>${esc(member.family || '—')}</td><td>${esc(member.maritalStatus || '—')}</td>
+  <td>${esc(member.className || '—')}</td></tr>`).join('') || `<tr>
+  <td colspan="6">${emptyState('No check-ins match these filters.')}</td></tr>`}</tbody></table></div></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">Directory breakdown</p><h2>People by life stage</h2></div></div>
+  <div class="breakdown"><div><span>Adults</span><strong>${Math.max(0, s.total - s.youth - s.children)}</strong>
+  <div class="bar"><i style="width:${s.total ? ((s.total - s.youth - s.children) / s.total) * 100 : 0}%"></i></div></div>
+  <div><span>Youth</span><strong>${s.youth}</strong><div class="bar"><i style="width:${s.total ? (s.youth / s.total) * 100 : 0}%"></i></div></div><div><span>Children</span><strong>${s.children}</strong>
+  <div class="bar"><i style="width:${s.total ? (s.children / s.total) * 100 : 0}%"></i></div></div></div></section>`);
 }
 
-function render() { document.querySelector('#app').innerHTML = state.view === 'overview' ? overview() : state.view === 'check-in' ? checkIn() : state.view === 'members' ? members() : state.view === 'attendance' ? attendance() : reports(); bindEvents(); }
+function recordRows() {
+  const filters = state.recordFilters;
+  const normalize = (value) => String(value ?? '').trim();
+
+  return state.members
+    .map((member) => ({
+      ...member,
+      id: normalize(member.id),
+      name: normalize(member.name),
+      category: normalize(member.category),
+      gender: normalize(member.gender),
+      family: normalize(member.family),
+      phone: normalize(member.phone),
+      maritalStatus: normalize(member.maritalStatus ?? member.marital_status),
+      marriedGroup: normalize(member.marriedGroup ?? member.married_group),
+      className: normalize(member.className ?? member.class_name),
+      createdAt: normalize(member.createdAt ?? member.created_at)
+    }))
+    .filter((member) => {
+      const query = filters.name.trim().toLowerCase();
+
+      // Search across the member's available details.
+      const searchable = [
+        member.id,
+        member.name,
+        member.category,
+        member.gender,
+        member.family,
+        member.phone,
+        member.maritalStatus,
+        member.marriedGroup,
+        member.className,
+        member.createdAt
+      ].join(' ').toLowerCase();
+
+      if (query && !searchable.includes(query)) return false;
+      if (filters.gender && member.gender.toLowerCase() !== filters.gender.toLowerCase()) return false;
+      if (filters.family && member.family.toLowerCase() !== filters.family.toLowerCase()) return false;
+      if (filters.detail && member.maritalStatus.toLowerCase() !== filters.detail.toLowerCase()) return false;
+      if (filters.category && member.category.toLowerCase() !== filters.category.toLowerCase()) return false;
+      if (filters.marriedGroup && member.marriedGroup.toLowerCase() !== filters.marriedGroup.toLowerCase()) return false;
+      if (filters.className && member.className.toLowerCase() !== filters.className.toLowerCase()) return false;
+
+      return true;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function records() {
+  const rows = recordRows();
+  const filters = state.recordFilters;
+
+  const optionList = (values, selected) =>
+    values.map((value) =>
+      `<option value="${esc(value)}" ${selected === value ? 'selected' : ''}>${esc(value)}</option>`
+    ).join('');
+
+  const uniqueOptions = (field) => [
+    ...new Set(state.members.map((member) =>
+      String(member[field] ?? member[
+        field === 'maritalStatus' ? 'marital_status' :
+        field === 'marriedGroup' ? 'married_group' :
+        field === 'className' ? 'class_name' : field
+      ] ?? '').trim()
+    ))
+  ].filter(Boolean).sort((a, b) => a.localeCompare(b));
+
+  const families = [...new Set([
+    ...FAMILY_NAMES,
+    ...uniqueOptions('family')
+  ])].sort((a, b) => a.localeCompare(b));
+
+  const genders = uniqueOptions('gender');
+  const categories = uniqueOptions('category');
+  const details = uniqueOptions('maritalStatus');
+  const groups = uniqueOptions('marriedGroup');
+  const classes = uniqueOptions('className');
+
+  const checkedInCount = rows.filter((member) =>
+    state.attendance.some((entry) =>
+      String(entry.memberId ?? entry.member_id ?? '') === member.id
+    )
+  ).length;
+
+  return shell(`
+    <section class="page-heading compact">
+      <div>
+        <p class="eyebrow">Complete church directory</p>
+        <h1>Church Records</h1>
+        <p class="subheading">Search and filter all registered people, including those without attendance records.</p>
+      </div>
+      <button class="secondary-button" data-action="records-reset">Reset filters</button>
+    </section>
+
+    <section class="report-grid">
+      <div class="report-feature">
+        <p class="eyebrow">Matching records</p>
+        <strong>${rows.length}</strong>
+        <small>People matching your filters</small>
+      </div>
+      <div class="report-card">
+        <strong>${state.members.length}</strong>
+        <span>Total registered</span>
+        <small>All people in the directory</small>
+      </div>
+      <div class="report-card">
+        <strong>${Math.max(0, rows.length - checkedInCount)}</strong>
+        <span>Never checked in</span>
+        <small>Among matching records</small>
+      </div>
+      <div class="report-card">
+        <strong>${new Set(rows.map((member) => member.family).filter(Boolean)).size}</strong>
+        <span>Families represented</span>
+        <small>Among matching records</small>
+      </div>
+    </section>
+
+    <section class="panel report-filters">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Database filters</p>
+          <h2>Find church records</h2>
+        </div>
+      </div>
+
+      <form class="report-filter-grid" data-action="records-filter">
+        <label>Search all details
+          <input name="name" value="${esc(filters.name)}"
+            placeholder="Name, ID, phone, group, class..." />
+        </label>
+
+        <label>Gender
+          <select name="gender">
+            <option value="">All genders</option>
+            ${optionList(genders, filters.gender)}
+          </select>
+        </label>
+
+        <label>Family
+          <select name="family">
+            <option value="">All families</option>
+            ${optionList(families, filters.family)}
+          </select>
+        </label>
+
+        <label>Category
+          <select name="category">
+            <option value="">All categories</option>
+            ${optionList(categories, filters.category)}
+          </select>
+        </label>
+
+        <label>Life stage / detail
+          <select name="detail">
+            <option value="">All details</option>
+            ${optionList(details, filters.detail)}
+          </select>
+        </label>
+
+        <label>Married group
+          <select name="marriedGroup">
+            <option value="">All groups</option>
+            ${optionList(groups, filters.marriedGroup)}
+          </select>
+        </label>
+
+        <label>Class
+          <select name="className">
+            <option value="">All classes</option>
+            ${optionList(classes, filters.className)}
+          </select>
+        </label>
+
+        <div class="report-filter-actions">
+          <button class="primary-button" type="submit">Apply filters</button>
+          <button class="secondary-button" type="button" data-action="records-reset">Reset</button>
+          <button class="secondary-button" type="button" data-action="records-export">Download CSV</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Complete directory</p>
+          <h2>${rows.length} records</h2>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Member ID</th>
+              <th>Full name</th>
+              <th>Category</th>
+              <th>Gender</th>
+              <th>Family</th>
+              <th>Phone</th>
+              <th>Life stage / detail</th>
+              <th>Married group</th>
+              <th>Class</th>
+              <th>Registered</th>
+              <th>Attendance</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map((member) => {
+              const hasAttendance = state.attendance.some((entry) =>
+                String(entry.memberId ?? entry.member_id ?? '') === member.id
+              );
+
+              return `
+                <tr>
+                  <td>${esc(member.id || '—')}</td>
+                  <td><strong>${esc(member.name || '—')}</strong></td>
+                  <td>${esc(member.category || '—')}</td>
+                  <td>${esc(member.gender || '—')}</td>
+                  <td>${esc(member.family || '—')}</td>
+                  <td>${esc(member.phone || '—')}</td>
+                  <td>${esc(member.maritalStatus || '—')}</td>
+                  <td>${esc(member.marriedGroup || '—')}</td>
+                  <td>${esc(member.className || '—')}</td>
+                  <td>${esc(member.createdAt ? member.createdAt.slice(0, 10) : '—')}</td>
+                  <td>${hasAttendance ? 'Has check-ins' : 'No check-ins'}</td>
+                </tr>
+              `;
+            }).join('') || `
+              <tr><td colspan="11">${emptyState('No records match these filters.')}</td></tr>
+            `}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  `);
+}
+
+
+function render() {
+  const pages = {
+    overview,
+    'check-in': checkIn,
+    members,
+    attendance,
+    reports,
+    records
+  };
+
+  document.querySelector('#app').innerHTML =
+    (pages[state.view] || overview)();
+
+  bindEvents();
+}
 function showToast(message, error = false) { const toast = document.createElement('div'); toast.className = `toast ${error ? 'error' : ''}`; toast.textContent = message; document.body.append(toast); setTimeout(() => toast.remove(), 3200); }
 
 function bindEvents() {
