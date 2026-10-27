@@ -629,7 +629,6 @@ function bindEvents() {
   document.querySelectorAll('[data-date-chip]').forEach((button) => button.addEventListener('click', () => { state.today = button.dataset.dateChip; render(); }));
   document.querySelector('[data-action="show-form"]')?.addEventListener('click', showMemberForm);
   document.querySelector('[data-action="export"]')?.addEventListener('click', exportCsv);
-  
   document.querySelector('[data-action="report-filter"]')
   ?.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -656,9 +655,7 @@ function bindEvents() {
 
     // Refresh the report using the selected filters.
     render();
-  });
-  
-  
+  });  
   document.querySelector('[data-action="report-reset"]')
   ?.addEventListener('click', () => {
     state.reportFilters = {
@@ -672,8 +669,48 @@ function bindEvents() {
 
     render();
   });
-  
   document.querySelector('[data-action="report-export"]')?.addEventListener('click', () => exportReportCsv(reportRows()));
+  
+  document.querySelector('[data-action="records-filter"]')
+    ?.addEventListener('submit', (event) => {
+      event.preventDefault();
+
+      const data = new FormData(event.currentTarget);
+
+      state.recordFilters = {
+        name: String(data.get('name') || ''),
+        gender: String(data.get('gender') || ''),
+        family: String(data.get('family') || ''),
+        detail: String(data.get('detail') || ''),
+        category: String(data.get('category') || ''),
+        marriedGroup: String(data.get('marriedGroup') || ''),
+        className: String(data.get('className') || '')
+      };
+
+      render();
+    });
+
+  document.querySelectorAll('[data-action="records-reset"]')
+    .forEach((button) => {
+      button.addEventListener('click', () => {
+        state.recordFilters = {
+          name: '',
+          gender: '',
+          family: '',
+          detail: '',
+          category: '',
+          marriedGroup: '',
+          className: ''
+        };
+
+        render();
+      });
+    });
+
+  document.querySelector('[data-action="records-export"]')
+    ?.addEventListener('click', () => {
+      exportRecordsCsv(recordRows());
+    });
   document.querySelector('[data-action="logout"]')?.addEventListener('click', async () => { try { await apiRequest('/auth/logout', { method: 'POST' }); } finally { endSession(); } });
 }
 
