@@ -8,13 +8,7 @@ const FAMILY_NAMES = ['Shepherds', 'Apostles', 'Prophets', 'Kings', 'Disciples',
 let inactivityTimer;
 let lastActivityWrite = 0;
 
-// const seedMembers = [
-//   { id: 'BTL-001', name: 'Grace Namirembe', gender: 'Female', family: 'Namirembe', category: 'Member', maritalStatus: 'Married', phone: '0782 109 519', createdAt: '2026-09-01' },
-//   { id: 'BTL-002', name: 'Daniel Kato', gender: 'Male', family: 'Kato', category: 'Member', maritalStatus: 'Single', phone: '0704 210 118', createdAt: '2026-09-02' },
-//   { id: 'BTL-003', name: 'Sarah Achieng', gender: 'Female', family: 'Achieng', category: 'Visitor', maritalStatus: 'Youth', phone: '', createdAt: '2026-09-14' },
-//   { id: 'BTL-004', name: 'Michael Okello', gender: 'Male', family: 'Okello', category: 'Member', maritalStatus: 'Single', phone: '', createdAt: '2026-09-18' },
-//   { id: 'BTL-005', name: 'Esther Nakato', gender: 'Female', family: 'Nakato', category: 'Member', maritalStatus: 'Child', phone: '', createdAt: '2026-09-20' }
-// ];
+
 
 const state = {
   view: 'overview',
@@ -240,7 +234,7 @@ function reportRows() {
 
 
 async function createMember(member) {
-  return apiRequest('/members', { method: 'POST', body: JSON.stringify({ ...member, id: `BTL-${String(state.members.length + 1).padStart(3, '0')}` }) });
+  return apiRequest('/members', { method: 'POST', body: JSON.stringify({ ...member, id: `M-${String(state.members.length + 1).padStart(3, '0')}` }) });
 }
 
 async function hydrateFromDatabase() {
