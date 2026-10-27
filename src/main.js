@@ -295,7 +295,7 @@ function overview() {
   return shell(`<section class="page-heading"><div>
    
     <h1>Welcome Back.</h1>
-    <p class="subheading">Bethel Church Attendance records.</p>
+    <p class="subheading">over view</p>
     </div><button class="primary-button" data-view="check-in"><span>+</span> Start check-in</button>
     </section>
     <section class="stats-grid">${statCard('Total people', s.total, 'Registered in database')}${statCard('Present today', s.present, `${s.present ? 'Attendance recorded' : 'Ready for check-in'}`)}${statCard('Visitors', s.visitors, 'People visiting Bethel')}${statCard('Youth & children', s.youth + s.children, `${s.youth} youth · ${s.children} children`)}</section>
@@ -318,7 +318,7 @@ function members() {
 
 function attendance() {
   const dates = [...new Set([state.today, ...state.attendance.map((entry) => entry.date)])].sort().reverse();
-  return shell(`<section class="page-heading compact"><div><p class="eyebrow">Permanent history</p><h1>Attendance history</h1><p class="subheading">Review who was present on each recorded day.</p></div><label class="date-picker">View date <input type="date" data-date value="${state.today}" /></label></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">${todayLabel()}</p><h2>${stats().present} people present</h2></div><button class="text-button" data-view="check-in">Take attendance →</button></div><div class="attendance-table">${state.members.map((member) => `<div class="history-row"><div class="member-row">${memberRow(member)}</div><span class="history-status ${isCheckedIn(member.id) ? 'is-present' : ''}">${isCheckedIn(member.id) ? `Present · ${esc(arrivalTime(member.id))}` : 'Not recorded'}</span></div>`).join('')}</div></section><section class="panel history-summary"><div class="panel-heading"><div><p class="eyebrow">Recorded days</p><h2>Attendance log</h2></div></div><div class="date-chips">${dates.map((date) => `<button class="date-chip ${date === state.today ? 'selected' : ''}" data-date-chip="${date}"><strong>${new Date(`${date}T12:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</strong><small>${state.attendance.filter((entry) => entry.date === date).length} present</small></button>`).join('')}</div></section>`);
+  return shell(`<section class="page-heading compact"><div><p class="eyebrow">Permanent history</p><h1>Attendance history</h1><p class="subheading"></p></div><label class="date-picker">View date <input type="date" data-date value="${state.today}" /></label></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">${todayLabel()}</p><h2>${stats().present} people present</h2></div><button class="text-button" data-view="check-in">Take attendance →</button></div><div class="attendance-table">${state.members.map((member) => `<div class="history-row"><div class="member-row">${memberRow(member)}</div><span class="history-status ${isCheckedIn(member.id) ? 'is-present' : ''}">${isCheckedIn(member.id) ? `Present · ${esc(arrivalTime(member.id))}` : 'Not recorded'}</span></div>`).join('')}</div></section><section class="panel history-summary"><div class="panel-heading"><div><p class="eyebrow">Recorded days</p><h2>Attendance log</h2></div></div><div class="date-chips">${dates.map((date) => `<button class="date-chip ${date === state.today ? 'selected' : ''}" data-date-chip="${date}"><strong>${new Date(`${date}T12:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</strong><small>${state.attendance.filter((entry) => entry.date === date).length} present</small></button>`).join('')}</div></section>`);
 }
 
 function reports() {
@@ -453,7 +453,7 @@ function records() {
   return shell(`
     <section class="page-heading compact">
       <div>
-        <p class="eyebrow">Complete church directory</p>
+        <p class="eyebrow"></p>
         <h1>Church Records</h1>
         <p class="subheading"></p>
       </div>
