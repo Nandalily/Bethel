@@ -730,6 +730,66 @@ function exportCsv() { const rows = [['Member ID', 'Name', 'Category', 'Gender',
 
 function exportReportCsv(rows) { const data = [['Date', 'Arrival time', 'Member ID', 'Name', 'Gender', 'Family', 'Detail', 'Class'], ...rows.map(({ entry, member }) => [entry.date, entry.checkedInAt || '', member.id, member.name, member.gender, member.family, member.maritalStatus, member.className])]; const csv = data.map((row) => row.map((cell) => `"${String(cell || '').replaceAll('"', '""')}"`).join(',')).join('\n'); const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); link.download = `bethel-attendance-report-${state.reportFilters.from || 'all'}-to-${state.reportFilters.to || 'all'}.csv`; link.click(); URL.revokeObjectURL(link.href); showToast('Attendance report downloaded'); }
 
+
+function exportRecordsCsv(rows) {
+  const data = [
+    [
+      'Member ID',
+      'Name',
+      'Category',
+      'Gender',
+      'Family',
+      'Phone',
+      'Life stage / detail',
+      'Married group',
+      'Class',
+      'Registration date',
+      'Attendance status'
+    ],
+    ...rows.map((member) => {
+      const hasAttendance = state.attendance.some((entry) =>
+        String(entry.memberId ?? entry.member_id ?? '') === member.id
+      );
+
+      return [
+        member.id,
+        member.name,
+        member.category,
+        member.gender,
+        member.family,
+        member.phone,
+        member.maritalStatus,
+        member.marriedGroup,
+        member.className,
+        member.createdAt,
+        hasAttendance ? 'Has check-ins' : 'No check-ins'
+      ];
+    })
+  ];
+
+  const csv = data
+    .map((row) =>
+      row.map((cell) =>
+        `"${String(cell ?? '').replaceAll('"', '""')}"`
+      ).join(',')
+    )
+    .join('\r\n');
+
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(
+    new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8;' })
+  );
+
+  link.href = url;
+  link.download = `bethel-church-records-${state.today}.csv`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+
+  showToast('Church records downloaded');
+}
+
 function renderLogin(message = '') { document.querySelector('#app').innerHTML = `<main class="login-page"><div class="login-art"><div class="login-brand"><span class="brand-mark">B</span> BETHEL SDA CHURCH</div><div class="login-message">
   
   <h1>Welcome to<br /><em>Bethel SDA</em><br />Church Database</h1>
