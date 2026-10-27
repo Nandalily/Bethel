@@ -105,7 +105,7 @@ function esc(value = '') {
 }
 
 async function apiRequest(path, options = {}) {
-  const response = await fetch(`/api${path}.php`, {
+  const response = await fetch(`https://bethelsda.gt.tc/api${path}.php`, {
     ...options,
     headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
     credentials: 'include'
