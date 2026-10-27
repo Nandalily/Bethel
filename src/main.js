@@ -25,15 +25,14 @@ const state = {
   detail: '',
   name: ''
 },
-  databaseReportFilters: {
+ recordFilters: {
     name: '',
     gender: '',
     family: '',
     detail: '',
     category: '',
-    className: '',
-    phone: '',
-    attendanceStatus: ''
+    marriedGroup: '',
+    className: ''
   }
 };
 
@@ -242,119 +241,6 @@ function reportRows() {
     });
 }
 
-function databaseReportRows() {
-  const filters = state.databaseReportFilters;
-
-  const normalize = (value) => String(value ?? '').trim().toLowerCase();
-
-  const attendanceByMember = new Map();
-
-  // Count all attendance records for each registered member.
-  state.attendance.forEach((entry) => {
-    const memberId = String(
-      entry.memberId ?? entry.member_id ?? ''
-    ).trim();
-
-    if (!memberId) return;
-
-    attendanceByMember.set(
-      memberId,
-      (attendanceByMember.get(memberId) || 0) + 1
-    );
-  });
-
-  return state.members
-    .map((member) => {
-      const id = String(member.id ?? '').trim();
-
-      return {
-        ...member,
-        id,
-        name: String(member.name ?? ''),
-        category: String(member.category ?? ''),
-        gender: String(member.gender ?? ''),
-        family: String(member.family ?? ''),
-        phone: String(member.phone ?? ''),
-        maritalStatus: String(
-          member.maritalStatus ?? member.marital_status ?? ''
-        ),
-        className: String(
-          member.className ?? member.class_name ?? ''
-        ),
-        attendanceCount: attendanceByMember.get(id) || 0
-      };
-    })
-    .filter((member) => {
-      if (
-        filters.name &&
-        ![member.name, member.id].some((value) =>
-          normalize(value).includes(normalize(filters.name))
-        )
-      ) {
-        return false;
-      }
-
-      if (
-        filters.gender &&
-        normalize(member.gender) !== normalize(filters.gender)
-      ) {
-        return false;
-      }
-
-      if (
-        filters.family &&
-        normalize(member.family) !== normalize(filters.family)
-      ) {
-        return false;
-      }
-
-      if (
-        filters.detail &&
-        normalize(member.maritalStatus) !== normalize(filters.detail)
-      ) {
-        return false;
-      }
-
-      if (
-        filters.category &&
-        normalize(member.category) !== normalize(filters.category)
-      ) {
-        return false;
-      }
-
-      if (
-        filters.className &&
-        !normalize(member.className).includes(normalize(filters.className))
-      ) {
-        return false;
-      }
-
-      if (
-        filters.phone &&
-        !normalize(member.phone).includes(normalize(filters.phone))
-      ) {
-        return false;
-      }
-
-      if (
-        filters.attendanceStatus === 'checked-in' &&
-        member.attendanceCount === 0
-      ) {
-        return false;
-      }
-
-      if (
-        filters.attendanceStatus === 'never' &&
-        member.attendanceCount > 0
-      ) {
-        return false;
-      }
-
-      return true;
-    })
-    .sort((a, b) => a.name.localeCompare(b.name));
-}
-
 
 async function createMember(member) {
   return apiRequest('/members', { method: 'POST', body: JSON.stringify({ ...member, id: `M-${String(state.members.length + 1).padStart(3, '0')}` }) });
@@ -383,6 +269,7 @@ function shell(content) {
           ${navItem('members', 'Members', '♙')}
           ${navItem('attendance', 'Attendance', '▤')}
           ${navItem('reports', 'Reports', '▥')}
+          ${navItem('records', 'Records', '▤')}
         </nav>
         <div class="sidebar-bottom"><div class="location"><span class="status-dot"></span><div><strong>Live workspace</strong><small>Connected to MySQL</small></div></div><button class="logout-button" type="button" data-action="logout">Log out</button></div>
       </aside>
@@ -439,23 +326,6 @@ function reports() {
   const memberCount = state.members.filter((member) => member.category === 'Member').length;
   const filters = state.reportFilters;
   const rows = reportRows();
-    const databaseFilters = state.databaseReportFilters;
-  const databaseRows = databaseReportRows();
-
-  const databaseFamilyOptions = FAMILY_NAMES.map((family) => `
-    <option value="${esc(family)}"
-      ${databaseFilters.family === family ? 'selected' : ''}>
-      ${esc(family)}
-    </option>
-  `).join('');
-
-  const databaseDetails = [
-    'Children',
-    'Ambassadors',
-    'Young adults',
-    'Married',
-    'Not Married'
-  ];
   const uniquePeople = new Map(
   rows.map(({ member }) => [member.id, member])
 );
@@ -485,18 +355,7 @@ const uniqueMales = [...uniquePeople.values()]
     Download results
   </button>
 </div>
-  </form></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">Matching check-ins</p>
-  <h2>${rows.length} results</h2></div></div><div class="table-wrap"><table><thead><tr><th>Date & time</th>
-  <th>Person</th><th>Gender</th><th>Family</th><th>Detail</th><th>Class</th></tr></thead>
-  <tbody>${rows.map(({ entry, member }) => `<tr><td>${esc(entry.checkedInAt ? formatArrival(entry.checkedInAt) : entry.date)}</td>
-  <td><strong>${esc(member.name)}</strong><small>${esc(member.id)}</small></td><td>${esc(member.gender)}</td>
-  <td>${esc(member.family || '—')}</td><td>${esc(member.maritalStatus || '—')}</td>
-  <td>${esc(member.className || '—')}</td></tr>`).join('') || `<tr>
-  <td colspan="6">${emptyState('No check-ins match these filters.')}</td></tr>`}</tbody>
-  </table></div></section>
-  <section class="panel"><div class="panel-heading"><div><p class="eyebrow">Directory breakdown</p><h2>People by life stage</h2>
-  </div></div><div class="breakdown"><div><span>Adults</span><strong>${Math.max(0, s.total - s.youth - s.children)}</strong><div class="bar"><i style="width:${s.total ? ((s.total - s.youth - s.children) / s.total) * 100 : 0}%"></i></div></div><div><span>Youth</span><strong>${s.youth}</strong><div class="bar"><i style="width:${s.total ? (s.youth / s.total) * 100 : 0}%"></i></div></div><div><span>Children</span><strong>${s.children}</strong>
-  <div class="bar"><i style="width:${s.total ? (s.children / s.total) * 100 : 0}%"></i></div></div></div></section>`);
+  </form></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">Matching check-ins</p><h2>${rows.length} results</h2></div></div><div class="table-wrap"><table><thead><tr><th>Date & time</th><th>Person</th><th>Gender</th><th>Family</th><th>Detail</th><th>Class</th></tr></thead><tbody>${rows.map(({ entry, member }) => `<tr><td>${esc(entry.checkedInAt ? formatArrival(entry.checkedInAt) : entry.date)}</td><td><strong>${esc(member.name)}</strong><small>${esc(member.id)}</small></td><td>${esc(member.gender)}</td><td>${esc(member.family || '—')}</td><td>${esc(member.maritalStatus || '—')}</td><td>${esc(member.className || '—')}</td></tr>`).join('') || `<tr><td colspan="6">${emptyState('No check-ins match these filters.')}</td></tr>`}</tbody></table></div></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">Directory breakdown</p><h2>People by life stage</h2></div></div><div class="breakdown"><div><span>Adults</span><strong>${Math.max(0, s.total - s.youth - s.children)}</strong><div class="bar"><i style="width:${s.total ? ((s.total - s.youth - s.children) / s.total) * 100 : 0}%"></i></div></div><div><span>Youth</span><strong>${s.youth}</strong><div class="bar"><i style="width:${s.total ? (s.youth / s.total) * 100 : 0}%"></i></div></div><div><span>Children</span><strong>${s.children}</strong><div class="bar"><i style="width:${s.total ? (s.children / s.total) * 100 : 0}%"></i></div></div></div></section>`);
 }
 
 function render() { document.querySelector('#app').innerHTML = state.view === 'overview' ? overview() : state.view === 'check-in' ? checkIn() : state.view === 'members' ? members() : state.view === 'attendance' ? attendance() : reports(); bindEvents(); }
