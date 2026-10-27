@@ -24,7 +24,17 @@ const state = {
   family: '',
   detail: '',
   name: ''
-}
+},
+  databaseReportFilters: {
+    name: '',
+    gender: '',
+    family: '',
+    detail: '',
+    category: '',
+    className: '',
+    phone: '',
+    attendanceStatus: ''
+  }
 };
 
 function loadLocal() {
@@ -232,6 +242,119 @@ function reportRows() {
     });
 }
 
+function databaseReportRows() {
+  const filters = state.databaseReportFilters;
+
+  const normalize = (value) => String(value ?? '').trim().toLowerCase();
+
+  const attendanceByMember = new Map();
+
+  // Count all attendance records for each registered member.
+  state.attendance.forEach((entry) => {
+    const memberId = String(
+      entry.memberId ?? entry.member_id ?? ''
+    ).trim();
+
+    if (!memberId) return;
+
+    attendanceByMember.set(
+      memberId,
+      (attendanceByMember.get(memberId) || 0) + 1
+    );
+  });
+
+  return state.members
+    .map((member) => {
+      const id = String(member.id ?? '').trim();
+
+      return {
+        ...member,
+        id,
+        name: String(member.name ?? ''),
+        category: String(member.category ?? ''),
+        gender: String(member.gender ?? ''),
+        family: String(member.family ?? ''),
+        phone: String(member.phone ?? ''),
+        maritalStatus: String(
+          member.maritalStatus ?? member.marital_status ?? ''
+        ),
+        className: String(
+          member.className ?? member.class_name ?? ''
+        ),
+        attendanceCount: attendanceByMember.get(id) || 0
+      };
+    })
+    .filter((member) => {
+      if (
+        filters.name &&
+        ![member.name, member.id].some((value) =>
+          normalize(value).includes(normalize(filters.name))
+        )
+      ) {
+        return false;
+      }
+
+      if (
+        filters.gender &&
+        normalize(member.gender) !== normalize(filters.gender)
+      ) {
+        return false;
+      }
+
+      if (
+        filters.family &&
+        normalize(member.family) !== normalize(filters.family)
+      ) {
+        return false;
+      }
+
+      if (
+        filters.detail &&
+        normalize(member.maritalStatus) !== normalize(filters.detail)
+      ) {
+        return false;
+      }
+
+      if (
+        filters.category &&
+        normalize(member.category) !== normalize(filters.category)
+      ) {
+        return false;
+      }
+
+      if (
+        filters.className &&
+        !normalize(member.className).includes(normalize(filters.className))
+      ) {
+        return false;
+      }
+
+      if (
+        filters.phone &&
+        !normalize(member.phone).includes(normalize(filters.phone))
+      ) {
+        return false;
+      }
+
+      if (
+        filters.attendanceStatus === 'checked-in' &&
+        member.attendanceCount === 0
+      ) {
+        return false;
+      }
+
+      if (
+        filters.attendanceStatus === 'never' &&
+        member.attendanceCount > 0
+      ) {
+        return false;
+      }
+
+      return true;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 
 async function createMember(member) {
   return apiRequest('/members', { method: 'POST', body: JSON.stringify({ ...member, id: `M-${String(state.members.length + 1).padStart(3, '0')}` }) });
@@ -316,6 +439,23 @@ function reports() {
   const memberCount = state.members.filter((member) => member.category === 'Member').length;
   const filters = state.reportFilters;
   const rows = reportRows();
+    const databaseFilters = state.databaseReportFilters;
+  const databaseRows = databaseReportRows();
+
+  const databaseFamilyOptions = FAMILY_NAMES.map((family) => `
+    <option value="${esc(family)}"
+      ${databaseFilters.family === family ? 'selected' : ''}>
+      ${esc(family)}
+    </option>
+  `).join('');
+
+  const databaseDetails = [
+    'Children',
+    'Ambassadors',
+    'Young adults',
+    'Married',
+    'Not Married'
+  ];
   const uniquePeople = new Map(
   rows.map(({ member }) => [member.id, member])
 );
