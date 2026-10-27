@@ -345,7 +345,7 @@ const uniqueMales = [...uniquePeople.values()]
 `).join('');
 
   const details = ['Children', 'Ambassadors', 'Young adults', 'Married', 'Not Married'];
-  return shell(`<section class="page-heading compact"><div><p class="eyebrow"></p><h1>Church reports</h1><p class="subheading"></p></div></section><section class="report-grid"><div class="report-feature"><p class="eyebrow">Filtered attendance</p><strong>${rows.length}</strong><small>check-ins in selected period</small></div><div class="report-card"><strong>${new Set(rows.map(({ member }) => member.id)).size}</strong><span>People checked in</span><small>Unique people</small></div><div class="report-card"><strong>${uniqueFemales}</strong><span>Female attendees</span><small>Unique people in selected period</small></div><div class="report-card"><strong>${uniqueMales}</strong><span>Male check-ins</span><small>In selected period</small></div></section><section class="panel report-filters"><div class="panel-heading"><div><p class="eyebrow">Attendance report</p><h2>Choose filters</h2></div></div><form class="report-filter-grid" data-action="report-filter"><label>From date<input type="date" name="from" value="${esc(filters.from)}" /></label><label>To date<input type="date" name="to" value="${esc(filters.to)}" /></label><label>Person name<input name="name" value="${esc(filters.name)}" placeholder="Search by name or ID" /></label><label>Gender<select name="gender"><option value="">All genders</option><option ${filters.gender === 'Male' ? 'selected' : ''}>Male</option><option ${filters.gender === 'Female' ? 'selected' : ''}>Female</option></select></label><label>Family<select name="family"><option value="">All families</option>${familyOptions}</select></label><label>Life stage / detail<select name="detail"><option value="">All details</option>${details.map((detail) => `<option ${filters.detail === detail ? 'selected' : ''}>${detail}</option>`).join('')}</select></label>
+  return shell(`<section class="page-heading compact"><div><p class="eyebrow"></p><h1>Church reports</h1><p class="subheading"></p></div></section><section class="report-grid"><div class="report-feature"><p class="eyebrow">Filtered attendance</p><strong>${rows.length}</strong><small></small></div><div class="report-card"><strong>${new Set(rows.map(({ member }) => member.id)).size}</strong><span>People checked in</span><small></small></div><div class="report-card"><strong>${uniqueFemales}</strong><span>Female attendees</span><small></small></div><div class="report-card"><strong>${uniqueMales}</strong><span>Male check-ins</span><small></small></div></section><section class="panel report-filters"><div class="panel-heading"><div><p class="eyebrow">Attendance report</p><h2>Choose filters</h2></div></div><form class="report-filter-grid" data-action="report-filter"><label>From date<input type="date" name="from" value="${esc(filters.from)}" /></label><label>To date<input type="date" name="to" value="${esc(filters.to)}" /></label><label>Person name<input name="name" value="${esc(filters.name)}" placeholder="Search by name or ID" /></label><label>Gender<select name="gender"><option value="">All genders</option><option ${filters.gender === 'Male' ? 'selected' : ''}>Male</option><option ${filters.gender === 'Female' ? 'selected' : ''}>Female</option></select></label><label>Family<select name="family"><option value="">All families</option>${familyOptions}</select></label><label>Life stage / detail<select name="detail"><option value="">All details</option>${details.map((detail) => `<option ${filters.detail === detail ? 'selected' : ''}>${detail}</option>`).join('')}</select></label>
  <div class="report-filter-actions">
   <button class="primary-button" type="submit">Run report</button>
   <button class="secondary-button" type="button" data-action="report-reset">
@@ -464,12 +464,12 @@ function records() {
       <div class="report-feature">
         <p class="eyebrow">Matching records</p>
         <strong>${rows.length}</strong>
-        <small>People matching your filters</small>
+        <small></small>
       </div>
       <div class="report-card">
         <strong>${state.members.length}</strong>
         <span>Total registered</span>
-        <small>All people in the directory</small>
+        <small></small>
       </div>
       <div class="report-card">
         <strong>${Math.max(0, rows.length - checkedInCount)}</strong>
@@ -486,7 +486,7 @@ function records() {
     <section class="panel report-filters">
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">Database filters</p>
+          <p class="eyebrow"></p>
           <h2>Find church records</h2>
         </div>
       </div>
@@ -728,7 +728,7 @@ function showMemberForm() {
 
 function exportCsv() { const rows = [['Member ID', 'Name', 'Category', 'Gender', 'Family', 'Marital status', 'Phone'], ...state.members.map((member) => [member.id, member.name, member.category, member.gender, member.family, member.maritalStatus, member.phone])]; const csv = rows.map((row) => row.map((cell) => `"${String(cell || '').replaceAll('"', '""')}"`).join(',')).join('\n'); const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); link.download = `bethel-directory-${state.today}.csv`; link.click(); URL.revokeObjectURL(link.href); showToast('CSV report downloaded'); }
 
-function exportReportCsv(rows) { const data = [['Date', 'Arrival time', 'Member ID', 'Name', 'Gender', 'Family', 'Detail', 'Class'], ...rows.map(({ entry, member }) => [entry.date, entry.checkedInAt || '', member.id, member.name, member.gender, member.family, member.maritalStatus, member.className])]; const csv = data.map((row) => row.map((cell) => `"${String(cell || '').replaceAll('"', '""')}"`).join(',')).join('\n'); const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); link.download = `bethel-attendance-report-${state.reportFilters.from || 'all'}-to-${state.reportFilters.to || 'all'}.csv`; link.click(); URL.revokeObjectURL(link.href); showToast('Attendance report downloaded'); }
+function exportReportCsv(rows) { const data = [['Date', 'Arrival time', 'Member ID', 'Name', 'Gender', 'Family', 'Detail', 'Class'], ...rows.map(({ entry, member }) => [entry.date, entry.checkedInAt || '', member.id, member.name, member.gender, member.family, member.maritalStatus, member.className])]; const csv = data.map((row) => row.map((cell) => `"${String(cell || '').replaceAll('"', '""')}"`).join(',')).join('\n'); const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); link.download = `bethel-attendance-report-${state.reportFilters.from || 'all'}-to-${state.reportFilters.to || 'all'}.csv`; link.click(); URL.revokeObjectURL(link.href); showToast(' downloaded'); }
 
 
 function exportRecordsCsv(rows) {
