@@ -298,7 +298,7 @@ function overview() {
     <p class="subheading">over view</p>
     </div><button class="primary-button" data-view="check-in"><span>+</span> Start check-in</button>
     </section>
-    <section class="stats-grid">${statCard('Total people', s.total, 'Registered in database')}${statCard('Present today', s.present, `${s.present ? 'Attendance recorded' : 'Ready for check-in'}`)}${statCard('Visitors', s.visitors, 'People visiting Bethel')}${statCard('Youth & children', s.youth + s.children, `${s.youth} youth · ${s.children} children`)}</section>
+    <section class="stats-grid">${statCard('Total people', s.total, 'Registered in database')}${statCard('Present today', s.present, `${s.present ? 'Attendance recorded' : 'Ready for check-in'}`)}${statCard('Visitors', s.visitors, '')}${statCard('Youth & children', s.youth + s.children, `${s.youth} youth · ${s.children} children`)}</section>
     <div class="content-grid"><section class="panel attendance-panel"><div class="panel-heading"><div><p class="eyebrow">Today at Bethel</p><h2>Attendance snapshot</h2></div><button class="text-button" data-view="attendance">View history →</button></div><div class="attendance-visual"><div class="ring" style="--progress:${s.total ? Math.round((s.present / s.total) * 100) : 0}%"><div><strong>${s.present}</strong><small>of ${s.total} present</small></div></div><div class="legend"><div><span class="legend-dot present"></span><span>Present</span><strong>${s.present}</strong></div><div><span class="legend-dot remaining"></span><span>Not checked in</span><strong>${Math.max(0, s.total - s.present)}</strong></div><button class="outline-button" data-view="check-in">Open check-in</button></div></div></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">People by family</p><h2>Church family</h2></div><button class="icon-button" data-view="members" title="View all members">→</button></div><div class="family-list">${families.map(([family, count]) => `<div class="family-row"><span class="family-name">${esc(family)}</span><strong>${count}</strong><small>${count === 1 ? 'person' : 'people'}</small></div>`).join('') || emptyState('No people added yet.')}</div></section></div>`);
 }
 
@@ -311,14 +311,14 @@ function checkIn() {
 }
 
 function members() {
-  return shell(`<section class="page-heading compact"><div><p class="eyebrow">People directory</p><h1>Members & visitors</h1>
+  return shell(`<section class="page-heading compact"><div><p class="eyebrow"></p><h1>Members & visitors</h1>
   
     </div><button class="primary-button" data-action="show-form"><span>+</span> Add person</button></section><section class="panel"><div class="table-toolbar"><label class="search-box"><span>⌕</span><input data-search placeholder="Search the directory" value="${esc(state.query)}" /></label><span class="results-count">${state.members.length} total records</span></div><div class="table-wrap"><table><thead><tr><th>Person</th><th>Category</th><th>Gender</th><th>Family</th><th>Marital status</th><th>Phone</th></tr></thead><tbody>${filteredMembers().map((member) => `<tr><td><div class="table-person"><span class="person-avatar">${esc(member.name.charAt(0))}</span><div><strong>${esc(member.name)}</strong><small>${esc(member.id)}</small></div></div></td><td><span class="category-tag ${member.category.toLowerCase()}">${esc(member.category)}</span></td><td>${esc(member.gender)}</td><td>${esc(member.family || '—')}</td><td>${esc(member.maritalStatus)}</td><td>${esc(member.phone || '—')}</td></tr>`).join('') || `<tr><td colspan="6">${emptyState('No people found.')}</td></tr>`}</tbody></table></div></section>`);
 }
 
 function attendance() {
   const dates = [...new Set([state.today, ...state.attendance.map((entry) => entry.date)])].sort().reverse();
-  return shell(`<section class="page-heading compact"><div><p class="eyebrow">Permanent history</p><h1>Attendance history</h1><p class="subheading"></p></div><label class="date-picker">View date <input type="date" data-date value="${state.today}" /></label></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">${todayLabel()}</p><h2>${stats().present} people present</h2></div><button class="text-button" data-view="check-in">Take attendance →</button></div><div class="attendance-table">${state.members.map((member) => `<div class="history-row"><div class="member-row">${memberRow(member)}</div><span class="history-status ${isCheckedIn(member.id) ? 'is-present' : ''}">${isCheckedIn(member.id) ? `Present · ${esc(arrivalTime(member.id))}` : 'Not recorded'}</span></div>`).join('')}</div></section><section class="panel history-summary"><div class="panel-heading"><div><p class="eyebrow">Recorded days</p><h2>Attendance log</h2></div></div><div class="date-chips">${dates.map((date) => `<button class="date-chip ${date === state.today ? 'selected' : ''}" data-date-chip="${date}"><strong>${new Date(`${date}T12:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</strong><small>${state.attendance.filter((entry) => entry.date === date).length} present</small></button>`).join('')}</div></section>`);
+  return shell(`<section class="page-heading compact"><div><p class="eyebrow"></p><h1>Attendance history</h1><p class="subheading"></p></div><label class="date-picker"> <input type="date" data-date value="${state.today}" /></label></section><section class="panel"><div class="panel-heading"><div><p class="eyebrow">${todayLabel()}</p><h2>${stats().present} people present</h2></div><button class="text-button" data-view="check-in">Take attendance →</button></div><div class="attendance-table">${state.members.map((member) => `<div class="history-row"><div class="member-row">${memberRow(member)}</div><span class="history-status ${isCheckedIn(member.id) ? 'is-present' : ''}">${isCheckedIn(member.id) ? `Present · ${esc(arrivalTime(member.id))}` : 'Not recorded'}</span></div>`).join('')}</div></section><section class="panel history-summary"><div class="panel-heading"><div><p class="eyebrow"></p><h2>Attendance log</h2></div></div><div class="date-chips">${dates.map((date) => `<button class="date-chip ${date === state.today ? 'selected' : ''}" data-date-chip="${date}"><strong>${new Date(`${date}T12:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</strong><small>${state.attendance.filter((entry) => entry.date === date).length} present</small></button>`).join('')}</div></section>`);
 }
 
 function reports() {
@@ -474,12 +474,12 @@ function records() {
       <div class="report-card">
         <strong>${Math.max(0, rows.length - checkedInCount)}</strong>
         <span>Never checked in</span>
-        <small>Among matching records</small>
+        <small></small>
       </div>
       <div class="report-card">
         <strong>${new Set(rows.map((member) => member.family).filter(Boolean)).size}</strong>
         <span>Families represented</span>
-        <small>Among matching records</small>
+        <small></small>
       </div>
     </section>
 
