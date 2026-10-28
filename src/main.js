@@ -107,18 +107,48 @@ function esc(value = '') {
   return String(value).replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
 }
 
+
 async function apiRequest(path, options = {}) {
-  const response = await fetch(`https://bethelsda.gt.tc/api${path}.php`, {
-    ...options,
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-    credentials: 'include'
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new Error(body.error || `Request failed with status ${response.status}.`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const response = await fetch(`/api${path}.php`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options.headers || {})
+      },
+      credentials: 'same-origin',
+      signal: controller.signal
+    });
+
+    const body = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      throw new Error(
+        body?.error || `Request failed with status ${response.status}.`
+      );
+    }
+
+    return response.status === 204 ? null : body;
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error('The server took too long to respond. Please try again.');
+    }
+
+    if (error instanceof TypeError) {
+      throw new Error(
+        'Could not reach the server. Check your internet connection and try again.'
+      );
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
-  return response.status === 204 ? null : response.json();
 }
+
 
 function filteredMembers() {
   const query = state.query.trim().toLowerCase();
